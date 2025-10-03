@@ -526,7 +526,7 @@
 
         // Send a request to fetch the purchase details for the given ID
         $.ajax({
-            url: '/pembelian/' + id,
+            url: '/pembelian/' + id + '?details_only=1',
             method: 'GET',
             success: function(response) {
                 // Initialize the DataTable for purchase details

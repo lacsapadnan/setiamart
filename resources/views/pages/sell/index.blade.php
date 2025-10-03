@@ -691,7 +691,7 @@
 
         // Send a request to fetch the sell details for the given ID
         $.ajax({
-            url: '/penjualan/' + id,
+            url: '/penjualan/' + id + '?details_only=1',
             method: 'GET',
             success: function(response) {
                 // Initialize the DataTable for sell details

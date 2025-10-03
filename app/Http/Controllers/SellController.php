@@ -472,7 +472,7 @@ class SellController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
         $userRoles = auth()->user()->getRoleNames();
 
@@ -497,6 +497,12 @@ class SellController extends Controller
             return response()->json(['error' => 'Data penjualan tidak ditemukan atau Anda tidak memiliki akses'], 404);
         }
 
+        // If 'details_only' parameter is present, return only details array
+        if ($request->has('details_only')) {
+            return response()->json($sell->details);
+        }
+
+        // Otherwise, return full sell object for credit detail modal
         return response()->json($sell);
     }
 
