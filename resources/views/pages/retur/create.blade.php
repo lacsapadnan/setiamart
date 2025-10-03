@@ -266,7 +266,7 @@
                     'order': [],
                     'pageLength': 10,
                     "ajax": {
-                        url: '/penjualan/' + id,
+                        url: '/penjualan/' + id + '?details_only=true',
                         type: 'GET',
                         dataSrc: '',
                     },
