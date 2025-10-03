@@ -373,8 +373,29 @@ class PurchaseController extends Controller
      */
     public function show(string $id)
     {
-        $purchaseDetail = PurchaseDetail::with('product', 'unit')->where('purchase_id', $id)->get();
-        return response()->json($purchaseDetail);
+        $userRoles = auth()->user()->getRoleNames();
+
+        $query = Purchase::with([
+            'supplier',
+            'warehouse',
+            'details.product.unit_dus',
+            'details.product.unit_pak',
+            'details.product.unit_eceran',
+            'details.unit'
+        ]);
+
+        // Apply warehouse filter for non-master users
+        if ($userRoles[0] != 'master') {
+            $query->where('warehouse_id', auth()->user()->warehouse_id);
+        }
+
+        $purchase = $query->find($id);
+
+        if (!$purchase) {
+            return response()->json(['error' => 'Data pembelian tidak ditemukan atau Anda tidak memiliki akses'], 404);
+        }
+
+        return response()->json($purchase);
     }
 
     /**
@@ -628,7 +649,7 @@ class PurchaseController extends Controller
                 ->whereDate('created_at', '<=', $endDate);
         }
 
-        $purchases = $purchases->get();
+        $purchases = $purchases->orderBy('id', 'desc')->get();
 
         return response()->json($purchases);
     }

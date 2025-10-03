@@ -474,17 +474,30 @@ class SellController extends Controller
      */
     public function show(string $id)
     {
-        $sellDetail = SellDetail::with([
-            'product' => function ($query) {
-                $query->with(['unit_dus', 'unit_pak', 'unit_eceran']);
-            },
-            'unit',
-            'sell' => function ($query) {
-                $query->with(['warehouse', 'customer']);
-            }
-        ])->where('sell_id', $id)->get();
+        $userRoles = auth()->user()->getRoleNames();
 
-        return response()->json($sellDetail);
+        $query = Sell::with([
+            'warehouse',
+            'customer',
+            'cashier',
+            'details.product.unit_dus',
+            'details.product.unit_pak',
+            'details.product.unit_eceran',
+            'details.unit'
+        ]);
+
+        // Apply warehouse filter for non-master users
+        if ($userRoles[0] != 'master') {
+            $query->where('warehouse_id', auth()->user()->warehouse_id);
+        }
+
+        $sell = $query->find($id);
+
+        if (!$sell) {
+            return response()->json(['error' => 'Data penjualan tidak ditemukan atau Anda tidak memiliki akses'], 404);
+        }
+
+        return response()->json($sell);
     }
 
     /**

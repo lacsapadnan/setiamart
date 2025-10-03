@@ -175,6 +175,275 @@
         </div>
     </div>
 </div>
+
+<!-- Credit Detail Modal -->
+<div class="modal fade" id="creditDetailModal" tabindex="-1" role="dialog" aria-labelledby="creditDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="creditDetailModalLabel">
+                    <i class="ki-duotone ki-document fs-2 me-2"></i>
+                    Detail Penjualan Piutang
+                </h5>
+                <div class="btn btn-icon btn-sm btn-active-light-primary ms-2" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card border">
+                            <div class="card-body">
+                                <h6 class="card-title">Informasi Penjualan</h6>
+                                <div class="row">
+                                    <div class="col-sm-6">
+                                        <div class="fs-7 text-muted">No. Order</div>
+                                        <div class="fs-5 fw-bold" id="creditDetailOrderNumber">-</div>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <div class="fs-7 text-muted">Customer</div>
+                                        <div class="fs-5 fw-bold" id="creditDetailCustomer">-</div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-sm-6">
+                                        <div class="fs-7 text-muted">Tanggal</div>
+                                        <div class="fs-6" id="creditDetailDate">-</div>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <div class="fs-7 text-muted">Cabang</div>
+                                        <div class="fs-6" id="creditDetailWarehouse">-</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border">
+                            <div class="card-body">
+                                <h6 class="card-title">Ringkasan Pembayaran</h6>
+                                <div class="row">
+                                    <div class="col-sm-6">
+                                        <div class="fs-7 text-muted">Total Penjualan</div>
+                                        <div class="fs-4 fw-bold text-primary" id="creditDetailGrandTotal">-</div>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <div class="fs-7 text-muted">Sudah Dibayar</div>
+                                        <div class="fs-4 fw-bold text-success" id="creditDetailPaid">-</div>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-sm-6">
+                                        <div class="fs-7 text-muted">Sisa Piutang</div>
+                                        <div class="fs-4 fw-bold text-danger" id="creditDetailRemaining">-</div>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <div class="fs-7 text-muted">Status</div>
+                                        <div class="fs-6">
+                                            <span class="badge badge-light-success" id="creditDetailStatus">Piutang</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">Detail Produk</h6>
+                        <div id="creditProductPaginationInfo" class="text-muted small"></div>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center mb-4">
+                            <div class="spinner-border text-primary" role="status" id="creditDetailLoading" style="display: none;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="text-center">#</th>
+                                        <th>Nama Produk</th>
+                                        <th class="text-center">Qty</th>
+                                        <th class="text-center">Satuan</th>
+                                        <th class="text-end">Harga Satuan</th>
+                                        <th class="text-end">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="creditDetailProductsTable">
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">Memuat data...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Pagination Controls -->
+                        <div class="d-flex justify-content-between align-items-center mt-3" id="creditProductPagination" style="display: none;">
+                            <button class="btn btn-sm btn-outline-primary" id="creditPrevPage" disabled>
+                                <i class="ki-duotone ki-arrow-left fs-6"></i>
+                                Sebelumnya
+                            </button>
+                            <div class="text-muted small" id="creditPaginationInfo"></div>
+                            <button class="btn btn-sm btn-outline-primary" id="creditNextPage" disabled>
+                                Selanjutnya
+                                <i class="ki-duotone ki-arrow-right fs-6"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                <button type="button" class="btn btn-primary" onclick="openPaymentModalFromDetail()">Terima Pembayaran</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Credit & Debt Details Modal -->
+<div class="modal fade" id="creditDebtModal" tabindex="-1" role="dialog" aria-labelledby="creditDebtModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="creditDebtModalLabel">
+                    <i class="ki-duotone ki-dollar fs-2 me-2"></i>
+                    Detail Hutang & Piutang
+                </h5>
+                <div class="btn btn-icon btn-sm btn-active-light-primary ms-2" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Debt Section -->
+                    <div class="col-md-6">
+                        <div class="card border">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">
+                                    <i class="ki-duotone ki-arrow-down fs-3 text-danger me-2"></i>
+                                    Hutang (Debt)
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="text-center mb-4">
+                                    <div class="spinner-border text-primary" role="status" id="debtLoading" style="display: none;">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                                <div id="debtContent">
+                                    <div class="row mb-3">
+                                        <div class="col-6">
+                                            <div class="fs-7 text-muted">Total Hutang</div>
+                                            <div class="fs-4 fw-bold text-danger" id="totalDebt">Rp 0</div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="fs-7 text-muted">Jumlah Transaksi</div>
+                                            <div class="fs-4 fw-bold" id="debtCount">0</div>
+                                        </div>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-borderless">
+                                            <thead>
+                                                <tr>
+                                                    <th class="ps-0 fw-bold fs-7 text-muted">Supplier</th>
+                                                    <th class="fw-bold fs-7 text-muted">Nominal</th>
+                                                    <th class="fw-bold fs-7 text-muted">Tanggal</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="debtTableBody">
+                                                <tr>
+                                                    <td colspan="3" class="text-center text-muted">Memuat data...</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Credit Section -->
+                    <div class="col-md-6">
+                        <div class="card border">
+                            <div class="card-header">
+                                <h6 class="card-title mb-0">
+                                    <i class="ki-duotone ki-arrow-up fs-3 text-success me-2"></i>
+                                    Piutang (Credit)
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="text-center mb-4">
+                                    <div class="spinner-border text-primary" role="status" id="creditLoading" style="display: none;">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                </div>
+                                <div id="creditContent">
+                                    <div class="row mb-3">
+                                        <div class="col-6">
+                                            <div class="fs-7 text-muted">Total Piutang</div>
+                                            <div class="fs-4 fw-bold text-success" id="totalCredit">Rp 0</div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="fs-7 text-muted">Jumlah Transaksi</div>
+                                            <div class="fs-4 fw-bold" id="creditCount">0</div>
+                                        </div>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-borderless">
+                                            <thead>
+                                                <tr>
+                                                    <th class="ps-0 fw-bold fs-7 text-muted">Customer</th>
+                                                    <th class="fw-bold fs-7 text-muted">Nominal</th>
+                                                    <th class="fw-bold fs-7 text-muted">Tanggal</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="creditTableBody">
+                                                <tr>
+                                                    <td colspan="3" class="text-center text-muted">Memuat data...</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Section -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card bg-light border">
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-md-4">
+                                        <div class="fs-7 text-muted">Total Hutang</div>
+                                        <div class="fs-3 fw-bold text-danger" id="summaryTotalDebt">Rp 0</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="fs-7 text-muted">Total Piutang</div>
+                                        <div class="fs-3 fw-bold text-success" id="summaryTotalCredit">Rp 0</div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="fs-7 text-muted">Selisih</div>
+                                        <div class="fs-3 fw-bold" id="netAmount">Rp 0</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                <a href="{{ route('hutang') }}" class="btn btn-outline-danger">Kelola Hutang</a>
+                <a href="{{ route('piutang') }}" class="btn btn-outline-success">Kelola Piutang</a>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('addon-script')
@@ -281,7 +550,15 @@
                         {
                             data: "id",
                             "render": function(data, type, row) {
-                                return `<button class="btn btn-sm btn-primary" onclick="openPaymentModal(${data}, ${row.grand_total - row.pay})">Terima</button>`;
+                                return `
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-sm btn-primary" onclick="openPaymentModal(${data}, ${row.grand_total - row.pay})">Terima</button>
+                                        <button class="btn btn-sm btn-info" onclick="showCreditDetail(${data})">
+                                            <i class="ki-duotone ki-eye fs-6"></i>
+                                            Detail
+                                        </button>
+                                    </div>
+                                `;
                             }
                         },
                     ],
@@ -520,7 +797,368 @@
                         });
                     }
                 },
-            });
+    });
+});
+
+// Global constants for pagination
+const itemsPerPage = 10;
+
+// Global variables for credit pagination
+let currentCreditPage = 1;
+let creditProductsData = [];
+
+// Function to render current page of credit products
+function renderCreditProductsPage() {
+    const startIndex = (currentCreditPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentItems = creditProductsData.slice(startIndex, endIndex);
+    const totalItems = creditProductsData.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+    // Update pagination info
+    document.getElementById('creditProductPaginationInfo').textContent = `Menampilkan ${totalItems} produk`;
+
+    let productsHtml = '';
+    if (currentItems.length > 0) {
+        currentItems.forEach((detail, index) => {
+            const actualIndex = startIndex + index + 1;
+            const unitPrice = new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR'
+            }).format(detail.price || 0).replace(',00', '');
+
+            const totalPrice = new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR'
+            }).format((detail.quantity || 0) * (detail.price || 0)).replace(',00', '');
+
+            productsHtml += `
+                <tr>
+                    <td class="text-center">${actualIndex}</td>
+                    <td>${detail.product?.name || '-'}</td>
+                    <td class="text-center">${detail.quantity || 0}</td>
+                    <td class="text-center">${detail.unit?.name || '-'}</td>
+                    <td class="text-end">${unitPrice}</td>
+                    <td class="text-end">${totalPrice}</td>
+                </tr>
+            `;
         });
+    } else {
+        productsHtml = '<tr><td colspan="6" class="text-center text-muted">Tidak ada detail produk</td></tr>';
+    }
+
+    document.getElementById('creditDetailProductsTable').innerHTML = productsHtml;
+
+    // Update pagination controls
+    if (totalPages > 1) {
+        document.getElementById('creditProductPagination').style.display = 'flex';
+        document.getElementById('creditPaginationInfo').textContent = `Halaman ${currentCreditPage} dari ${totalPages}`;
+        document.getElementById('creditPrevPage').disabled = currentCreditPage === 1;
+        document.getElementById('creditNextPage').disabled = currentCreditPage === totalPages;
+    } else {
+        document.getElementById('creditProductPagination').style.display = 'none';
+    }
+}
+
+// Function to show credit detail modal
+function showCreditDetail(sellId) {
+    // Reset pagination
+    currentCreditPage = 1;
+    creditProductsData = [];
+
+    // Show loading
+    document.getElementById('creditDetailLoading').style.display = 'block';
+    document.getElementById('creditDetailProductsTable').innerHTML = '<tr><td colspan="6" class="text-center text-muted">Memuat data...</td></tr>';
+
+    // Hide pagination initially
+    document.getElementById('creditProductPagination').style.display = 'none';
+
+    // Reset modal data
+    document.getElementById('creditDetailOrderNumber').textContent = '-';
+    document.getElementById('creditDetailCustomer').textContent = '-';
+    document.getElementById('creditDetailDate').textContent = '-';
+    document.getElementById('creditDetailWarehouse').textContent = '-';
+    document.getElementById('creditDetailGrandTotal').textContent = '-';
+    document.getElementById('creditDetailPaid').textContent = '-';
+    document.getElementById('creditDetailRemaining').textContent = '-';
+
+    // Store the current sell ID for payment modal
+    window.currentSellId = sellId;
+
+    // Fetch sell details
+    fetch(`/penjualan/${sellId}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Check if the response contains an error
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // Fill sell information
+            document.getElementById('creditDetailOrderNumber').textContent = data.order_number || '-';
+            document.getElementById('creditDetailCustomer').textContent = data.customer?.name || '-';
+            document.getElementById('creditDetailDate').textContent = data.created_at ?
+                new Date(data.created_at).toLocaleDateString('id-ID') : '-';
+            document.getElementById('creditDetailWarehouse').textContent = data.warehouse?.name || '-';
+
+            // Fill payment summary
+            const grandTotal = new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR'
+            }).format(data.grand_total || 0).replace(',00', '');
+
+            const paid = new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR'
+            }).format(data.pay || 0).replace(',00', '');
+
+            const remaining = new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR'
+            }).format((data.grand_total || 0) - (data.pay || 0)).replace(',00', '');
+
+            document.getElementById('creditDetailGrandTotal').textContent = grandTotal;
+            document.getElementById('creditDetailPaid').textContent = paid;
+            document.getElementById('creditDetailRemaining').textContent = remaining;
+
+            // Store products data for pagination
+            creditProductsData = data.details || [];
+
+            // Initialize pagination
+            renderCreditProductsPage();
+        })
+        .catch(error => {
+            console.error('Error loading sell details:', error);
+            let errorMessage = 'Gagal memuat data detail';
+            if (error.message.includes('404') || error.message.includes('tidak ditemukan')) {
+                errorMessage = 'Data penjualan tidak ditemukan';
+            } else if (error.message.includes('500')) {
+                errorMessage = 'Terjadi kesalahan server';
+            }
+            document.getElementById('creditDetailProductsTable').innerHTML = `<tr><td colspan="6" class="text-center text-danger">${errorMessage}</td></tr>`;
+        })
+        .finally(() => {
+            document.getElementById('creditDetailLoading').style.display = 'none';
+        });
+
+    // Show modal
+    $('#creditDetailModal').modal('show');
+}
+
+// Function to open payment modal from detail modal
+function openPaymentModalFromDetail() {
+    if (window.currentSellId) {
+        $('#creditDetailModal').modal('hide');
+        // Get the remaining amount and open payment modal
+        const remaining = document.getElementById('creditDetailRemaining').textContent;
+        const remainingAmount = parseFloat(remaining.replace(/[^\d]/g, '')) || 0;
+        openPaymentModal(window.currentSellId, remainingAmount);
+    }
+}
+
+// Pagination event listeners for credit modal
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('creditPrevPage').addEventListener('click', function() {
+        if (currentCreditPage > 1) {
+            currentCreditPage--;
+            renderCreditProductsPage();
+        }
+    });
+
+    document.getElementById('creditNextPage').addEventListener('click', function() {
+        const totalPages = Math.ceil(creditProductsData.length / itemsPerPage);
+        if (currentCreditPage < totalPages) {
+            currentCreditPage++;
+            renderCreditProductsPage();
+        }
+    });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const creditDebtModal = document.getElementById('creditDebtModal');
+
+    creditDebtModal.addEventListener('show.bs.modal', function() {
+        loadCreditDebtData();
+    });
+
+    function loadCreditDebtData() {
+        // Show loading spinners
+        document.getElementById('debtLoading').style.display = 'block';
+        document.getElementById('creditLoading').style.display = 'block';
+
+        // Fetch debt data
+        fetch('{{ route('api.hutang') }}')
+            .then(response => response.json())
+            .then(debtData => {
+                displayDebtData(debtData);
+            })
+            .catch(error => {
+                console.error('Error loading debt data:', error);
+                document.getElementById('debtTableBody').innerHTML = '<tr><td colspan="3" class="text-center text-danger">Gagal memuat data hutang</td></tr>';
+            })
+            .finally(() => {
+                document.getElementById('debtLoading').style.display = 'none';
+            });
+
+        // Fetch credit data
+        fetch('{{ route('api.piutang') }}')
+            .then(response => response.json())
+            .then(creditData => {
+                displayCreditData(creditData);
+            })
+            .catch(error => {
+                console.error('Error loading credit data:', error);
+                document.getElementById('creditTableBody').innerHTML = '<tr><td colspan="3" class="text-center text-danger">Gagal memuat data piutang</td></tr>';
+            })
+            .finally(() => {
+                document.getElementById('creditLoading').style.display = 'none';
+            });
+    }
+
+    function displayDebtData(data) {
+        let totalDebt = 0;
+        let debtRows = '';
+
+        if (data && data.length > 0) {
+            // Take only first 5 records for display
+            const displayData = data.slice(0, 5);
+
+            displayData.forEach(item => {
+                const remaining = item.grand_total - item.pay;
+                totalDebt += remaining;
+
+                const formattedAmount = new Intl.NumberFormat('id-ID', {
+                    style: 'currency',
+                    currency: 'IDR'
+                }).format(remaining).replace(',00', '');
+
+                const date = new Date(item.reciept_date).toLocaleDateString('id-ID');
+
+                debtRows += `
+                    <tr>
+                        <td class="ps-0">${item.supplier?.name || 'N/A'}</td>
+                        <td class="text-danger fw-semibold">${formattedAmount}</td>
+                        <td class="text-muted fs-8">${date}</td>
+                    </tr>
+                `;
+            });
+
+            // Add "View More" link if there are more than 5 records
+            if (data.length > 5) {
+                debtRows += `
+                    <tr>
+                        <td colspan="3" class="text-center">
+                            <a href="{{ route('hutang') }}" class="text-primary fw-semibold">Lihat ${data.length - 5} data lainnya...</a>
+                        </td>
+                    </tr>
+                `;
+            }
+        } else {
+            debtRows = '<tr><td colspan="3" class="text-center text-muted">Tidak ada data hutang</td></tr>';
+        }
+
+        document.getElementById('debtTableBody').innerHTML = debtRows;
+        document.getElementById('totalDebt').textContent = new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR'
+        }).format(totalDebt).replace(',00', '');
+        document.getElementById('debtCount').textContent = data ? data.length : 0;
+        document.getElementById('summaryTotalDebt').textContent = new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR'
+        }).format(totalDebt).replace(',00', '');
+
+        updateNetAmount();
+    }
+
+    function displayCreditData(data) {
+        let totalCredit = 0;
+        let creditRows = '';
+
+        if (data && data.length > 0) {
+            // Take only first 5 records for display
+            const displayData = data.slice(0, 5);
+
+            displayData.forEach(item => {
+                const remaining = item.grand_total - item.pay;
+                totalCredit += remaining;
+
+                const formattedAmount = new Intl.NumberFormat('id-ID', {
+                    style: 'currency',
+                    currency: 'IDR'
+                }).format(remaining).replace(',00', '');
+
+                const date = new Date(item.created_at).toLocaleDateString('id-ID');
+
+                creditRows += `
+                    <tr>
+                        <td class="ps-0">${item.customer?.name || 'N/A'}</td>
+                        <td class="text-success fw-semibold">${formattedAmount}</td>
+                        <td class="text-muted fs-8">${date}</td>
+                    </tr>
+                `;
+            });
+
+            // Add "View More" link if there are more than 5 records
+            if (data.length > 5) {
+                creditRows += `
+                    <tr>
+                        <td colspan="3" class="text-center">
+                            <a href="{{ route('piutang') }}" class="text-primary fw-semibold">Lihat ${data.length - 5} data lainnya...</a>
+                        </td>
+                    </tr>
+                `;
+            }
+        } else {
+            creditRows = '<tr><td colspan="3" class="text-center text-muted">Tidak ada data piutang</td></tr>';
+        }
+
+        document.getElementById('creditTableBody').innerHTML = creditRows;
+        document.getElementById('totalCredit').textContent = new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR'
+        }).format(totalCredit).replace(',00', '');
+        document.getElementById('creditCount').textContent = data ? data.length : 0;
+        document.getElementById('summaryTotalCredit').textContent = new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR'
+        }).format(totalCredit).replace(',00', '');
+
+        updateNetAmount();
+    }
+
+    function updateNetAmount() {
+        const totalDebtText = document.getElementById('summaryTotalDebt').textContent;
+        const totalCreditText = document.getElementById('summaryTotalCredit').textContent;
+
+        // Extract numeric values
+        const totalDebt = parseFloat(totalDebtText.replace(/[^\d]/g, '')) || 0;
+        const totalCredit = parseFloat(totalCreditText.replace(/[^\d]/g, '')) || 0;
+
+        const netAmount = totalCredit - totalDebt;
+        const netAmountElement = document.getElementById('netAmount');
+
+        netAmountElement.textContent = new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR'
+        }).format(netAmount).replace(',00', '');
+
+        // Set color based on net amount
+        if (netAmount > 0) {
+            netAmountElement.className = 'fs-3 fw-bold text-success';
+        } else if (netAmount < 0) {
+            netAmountElement.className = 'fs-3 fw-bold text-danger';
+        } else {
+            netAmountElement.className = 'fs-3 fw-bold text-muted';
+        }
+    }
+});
 </script>
 @endpush
