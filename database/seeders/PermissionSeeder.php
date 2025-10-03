@@ -138,8 +138,14 @@ class PermissionSeeder extends Seeder
         // Permission::create(['name' => 'hapus activity log']);
 
         // Payment settings permissions
-        Permission::create(['name' => 'baca pengaturan pembayaran']);
-        Permission::create(['name' => 'simpan pengaturan pembayaran']);
-        Permission::create(['name' => 'update pengaturan pembayaran']);
+        // Permission::create(['name' => 'baca pengaturan pembayaran']);
+        // Permission::create(['name' => 'simpan pengaturan pembayaran']);
+        // Permission::create(['name' => 'update pengaturan pembayaran']);
+
+        // CRUD bank permissions
+        Permission::create(['name' => 'baca bank']);
+        Permission::create(['name' => 'simpan bank']);
+        Permission::create(['name' => 'update bank']);
+        Permission::create(['name' => 'hapus bank']);
     }
 }

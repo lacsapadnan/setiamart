@@ -34,6 +34,7 @@ use App\Http\Controllers\BackupController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\CashAdvanceController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\BankController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
@@ -69,6 +70,7 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::group(['middleware' => ['auth']], function () {
+    Route::resource('bank', BankController::class)->except(['show', 'create']);
     Route::resource('supplier', SupplierController::class)->except(['show', 'create']);
     Route::resource('customer', CustomerController::class)->except(['show', 'create']);
     Route::resource('cabang', WarehouseController::class)->except(['show', 'create']);
@@ -150,6 +152,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::get('kategori/api/data', [ProductController::class, 'category'])->name('api.kategori');
     Route::get('produk/api/data-search', [ProductController::class, 'dataSearch'])->name('api.produk-search');
     Route::get('penjualan/api/data', [SellController::class, 'data'])->name('api.penjualan');
+    Route::get('bank/api/data', [BankController::class, 'data'])->name('api.bank');
     Route::get('supplier/api/data', [SupplierController::class, 'data'])->name('api.supplier');
     Route::get('customer/api/data', [CustomerController::class, 'data'])->name('api.customer');
     Route::get('pembelian/api/data', [PurchaseController::class, 'data'])->name('api.pembelian');

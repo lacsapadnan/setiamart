@@ -190,7 +190,7 @@
                     </a>
                     <!--end:Menu link-->
                 </div>
-                @canany(['baca supplier', 'baca cabang', 'baca customer', 'baca karyawan'])
+                @canany(['baca supplier', 'baca cabang', 'baca customer', 'baca karyawan', 'baca bank'])
                 <div data-kt-menu-trigger="{default: 'click', lg: 'hover'}" data-kt-menu-placement="bottom-start"
                     class="menu-item menu-lg-down-accordion menu-sub-lg-down-indention me-0 me-lg-2">
                     <!--begin:Menu link-->
@@ -240,6 +240,17 @@
                             <!--begin:Menu link-->
                             <a class="menu-link" href="{{ route('karyawan.index') }}">
                                 <span class="menu-title">Data Karyawan</span>
+                            </a>
+                            <!--end:Menu link-->
+                        </div>
+                        <!--end:Menu item-->
+                        @endcan
+                        @can('baca bank')
+                        <!--begin:Menu item-->
+                        <div class="menu-item {{ request()->routeIs('bank.*') ? ' here' : '' }}">
+                            <!--begin:Menu link-->
+                            <a class="menu-link" href="{{ route('bank.index') }}">
+                                <span class="menu-title">Data Bank</span>
                             </a>
                             <!--end:Menu link-->
                         </div>
