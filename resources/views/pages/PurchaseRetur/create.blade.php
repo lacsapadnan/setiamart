@@ -162,7 +162,7 @@
                     'order': [],
                     'pageLength': 10,
                     "ajax": {
-                        url: '/pembelian/' + id,
+                        url: '/pembelian/' + id + '?details_only=true',
                         type: 'GET',
                         dataSrc: '',
                     },
