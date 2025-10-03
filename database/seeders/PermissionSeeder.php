@@ -134,7 +134,12 @@ class PermissionSeeder extends Seeder
         // Permission::create(['name' => 'hapus absensi']);
 
         // Activity log permissions
-        Permission::create(['name' => 'baca activity log']);
-        Permission::create(['name' => 'hapus activity log']);
+        // Permission::create(['name' => 'baca activity log']);
+        // Permission::create(['name' => 'hapus activity log']);
+
+        // Payment settings permissions
+        Permission::create(['name' => 'baca pengaturan pembayaran']);
+        Permission::create(['name' => 'simpan pengaturan pembayaran']);
+        Permission::create(['name' => 'update pengaturan pembayaran']);
     }
 }

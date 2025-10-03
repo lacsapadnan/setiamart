@@ -256,10 +256,10 @@
                 <br>
                 @if ($sell->warehouse->isOutOfTown)
                 <p>Pembayaran transfer ke rekening <span style="font-weight: bold">BCA</span></p>
-                <p style="font-weight: bold">8421789002 a/n Rizky Setiawan Wijaya.</p>
+                <p style="font-weight: bold">{{ $paymentSetting ? $paymentSetting->out_of_town_account_number : '8421789002' }} a/n {{ $paymentSetting ? $paymentSetting->out_of_town_account_name : 'Rizky Setiawan Wijaya' }}.</p>
                 @else
                 <p>Pembayaran transfer ke rekening <span style="font-weight: bold">BCA</span></p>
-                <p style="font-weight: bold">7285132827 a/n Andreas Jati Perkasa.</p>
+                <p style="font-weight: bold">{{ $paymentSetting ? $paymentSetting->in_town_account_number : '7285132827' }} a/n {{ $paymentSetting ? $paymentSetting->in_town_account_name : 'Andreas Jati Perkasa' }}.</p>
                 @endif
                 <p>Selain No. Rek tersebut dianggap belum bayar.</p>
             </div>

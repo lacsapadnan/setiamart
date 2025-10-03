@@ -19,6 +19,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SalaryController;
 use App\Http\Controllers\SalarySettingController;
+use App\Http\Controllers\PaymentSettingController;
 use App\Http\Controllers\SellController;
 use App\Http\Controllers\SellDraftController;
 use App\Http\Controllers\SellReturController;
@@ -140,6 +141,9 @@ Route::group(['middleware' => ['auth']], function () {
     // Salary Settings routes
     Route::resource('salary-settings', SalarySettingController::class)->except(['show']);
     Route::get('salary-settings/data', [SalarySettingController::class, 'data'])->name('salary-settings.data');
+
+    // Payment Settings routes
+    Route::resource('payment-settings', PaymentSettingController::class)->except(['show']);
 
     // API
     Route::get('produk/api/data', [ProductController::class, 'data'])->name('api.produk');

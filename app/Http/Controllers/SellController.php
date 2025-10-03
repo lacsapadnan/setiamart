@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\Inventory;
+use App\Models\PaymentSetting;
 use App\Models\Product;
 use App\Models\ProductReport;
 use App\Models\Sell;
@@ -411,7 +412,11 @@ class SellController extends Controller
 
         $totalQuantity = 0;
         $totalQuantity += $details->count();
-        $pdf = Pdf::loadView('pages.sell.print', compact('sell', 'details', 'totalQuantity', 'returnedItems'));
+
+        // Get payment settings
+        $paymentSetting = PaymentSetting::first();
+
+        $pdf = Pdf::loadView('pages.sell.print', compact('sell', 'details', 'totalQuantity', 'returnedItems', 'paymentSetting'));
 
         // Save the PDF to a file
         $pdf->save("receipt.pdf");
@@ -679,7 +684,11 @@ class SellController extends Controller
 
         $totalQuantity = 0;
         $totalQuantity += $details->count();
-        $pdf = Pdf::loadView('pages.sell.print', compact('sell', 'details', 'totalQuantity', 'returnedItems'));
+
+        // Get payment settings
+        $paymentSetting = PaymentSetting::first();
+
+        $pdf = Pdf::loadView('pages.sell.print', compact('sell', 'details', 'totalQuantity', 'returnedItems', 'paymentSetting'));
         return response()->stream(function () use ($pdf) {
             echo $pdf->output();
         }, 200, [

@@ -696,6 +696,19 @@
                             </a>
                             <!--end:Menu link-->
                             @endcan
+                            @can('baca pengaturan pembayaran')
+                            <!--begin:Menu link-->
+                            <a class="menu-link" href="{{ route('payment-settings.create') }}">
+                                <span class="menu-icon">
+                                    <i class="ki-duotone ki-dollar fs-2">
+                                        <i class="path1"></i>
+                                        <i class="path2"></i>
+                                    </i>
+                                </span>
+                                <span class="menu-title">Pengaturan Pembayaran</span>
+                            </a>
+                            <!--end:Menu link-->
+                            @endcan
                             @can('baca activity log')
                             <!--begin:Menu link-->
                             <a class="menu-link" href="{{ route('activity-log.index') }}">
