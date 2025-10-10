@@ -346,6 +346,9 @@ class IncomeStatementController extends Controller
         $allExpensesQuery = DB::table('kas as k')
             ->leftJoin('kas_expense_items as kei', 'k.kas_expense_item_id', '=', 'kei.id')
             ->select(
+                'k.date',
+                'k.invoice',
+                'k.description',
                 'k.amount',
                 'kei.name as category_name',
                 'k.kas_expense_item_id'
@@ -394,10 +397,21 @@ class IncomeStatementController extends Controller
             ];
         })->values()->toArray();
 
+        // Prepare detailed expense list
+        $expenseDetails = $filteredExpenses->map(function ($expense) {
+            return [
+                'date' => $expense->date,
+                'invoice' => $expense->invoice ?? '-',
+                'description' => $expense->description ?? '-',
+                'category' => $expense->category_name ?? 'Lainnya',
+                'amount' => floatval($expense->amount ?? 0)
+            ];
+        })->sortByDesc('date')->values()->toArray();
+
         return [
             'total_operating_expenses' => $totalExpenses,
             'expenses_by_category' => $expensesByCategory,
-            'expense_details' => [] // Don't return full details to save memory
+            'expense_details' => $expenseDetails
         ];
     }
 

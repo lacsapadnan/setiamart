@@ -336,6 +336,32 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Third Row: Operating Expenses Detail -->
+            <div class="mt-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Detail Beban Operasional</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-row-bordered gy-5 gs-7" id="operatingExpensesDetailTable">
+                                <thead>
+                                    <tr class="text-gray-800 fw-bold fs-6">
+                                        <th>No</th>
+                                        <th>Tanggal</th>
+                                        <th>Invoice</th>
+                                        <th>Deskripsi</th>
+                                        <th>Kategori</th>
+                                        <th>Jumlah</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -495,6 +521,23 @@
                     { "className": "text-center", "targets": [0, 2] },
                     { "className": "text-end", "targets": [3, 4] }
                 ]
+            });
+
+            // Initialize Operating Expenses Detail Table
+            $('#operatingExpensesDetailTable').DataTable({
+                "pageLength": 10,
+                "lengthMenu": [[10, 25, 50, 100], [10, 25, 50, 100]],
+                "searching": true,
+                "ordering": true,
+                "info": true,
+                "autoWidth": false,
+                "responsive": true,
+                "columnDefs": [
+                    { "orderable": false, "targets": 0 },
+                    { "className": "text-center", "targets": [0] },
+                    { "className": "text-end", "targets": 5 }
+                ],
+                "order": [[1, "desc"]] // Sort by date descending
             });
         }
 
@@ -756,6 +799,22 @@
                 ]);
             });
             stockBurdenTable.draw();
+
+            // Populate Operating Expenses detail table with DataTables
+            const expensesTable = $('#operatingExpensesDetailTable').DataTable();
+            expensesTable.clear();
+
+            data.operating_expenses.expense_details.forEach((expense, index) => {
+                expensesTable.row.add([
+                    index + 1,
+                    new Date(expense.date).toLocaleDateString('id-ID'),
+                    expense.invoice || '-',
+                    expense.description || '-',
+                    expense.category,
+                    formatCurrency(expense.amount)
+                ]);
+            });
+            expensesTable.draw();
         }
 
         function exportToExcel() {
@@ -856,6 +915,25 @@
 
             const ws4 = XLSX.utils.aoa_to_sheet(stockBurdenData);
             XLSX.utils.book_append_sheet(wb, ws4, 'Detail Beban Stok');
+
+            // Operating Expenses Detail Sheet
+            const operatingExpensesData = [
+                ['Detail Beban Operasional'],
+                ['No', 'Tanggal', 'Invoice', 'Deskripsi', 'Kategori', 'Jumlah']
+            ];
+            reportData.operating_expenses.expense_details.forEach((expense, index) => {
+                operatingExpensesData.push([
+                    index + 1,
+                    new Date(expense.date).toLocaleDateString('id-ID'),
+                    expense.invoice || '-',
+                    expense.description || '-',
+                    expense.category,
+                    formatCurrency(expense.amount)
+                ]);
+            });
+
+            const ws5 = XLSX.utils.aoa_to_sheet(operatingExpensesData);
+            XLSX.utils.book_append_sheet(wb, ws5, 'Detail Beban Operasional');
 
             // Export
             const filename = `Laporan_Laba_Rugi_${$('#fromDateFilter').val()}_${$('#toDateFilter').val()}.xlsx`;
