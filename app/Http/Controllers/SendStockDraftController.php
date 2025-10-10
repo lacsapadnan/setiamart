@@ -80,12 +80,18 @@ class SendStockDraftController extends Controller
             return redirect()->back()->with('error', 'Keranjang kosong. Tambahkan produk terlebih dahulu.');
         }
 
+        // Generate send stock number using same format as print function
+        $date = now()->format('Ymd');
+        $count = SendStock::count() + 1;
+        $sendStockNumber = "PS-{$date}-" . str_pad($count, 4, '0', STR_PAD_LEFT);
+
         // Create draft send stock
         $sendStock = SendStock::create([
             'user_id' => $user->id,
             'from_warehouse' => $fromWarehouse,
             'to_warehouse' => $toWarehouse,
             'status' => 'draft',
+            'send_stock_number' => $sendStockNumber,
         ]);
 
         $sendStockDetails = [];

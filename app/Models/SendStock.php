@@ -15,7 +15,8 @@ class SendStock extends Model
         'from_warehouse',
         'to_warehouse',
         'status',
-        'completed_at'
+        'completed_at',
+        'send_stock_number'
     ];
 
     protected $casts = [

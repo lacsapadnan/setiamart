@@ -78,6 +78,7 @@
                         <tr class="text-gray-400 text-start fw-bold fs-7 text-uppercase">
                             <th>No.</th>
                             <th>Kasir</th>
+                            <th>No. Pindah Stok</th>
                             <th>Cabang Awal</th>
                             <th>Cabang Tujuan</th>
                             <th>Tanggal Pindah Stok</th>
@@ -130,6 +131,9 @@
                         {
                             "data": "user.name",
                             defaultContent: '-'
+                        },
+                        {
+                            "data": "send_stock_number",
                         },
                         {
                             "data": "from_warehouse.name",

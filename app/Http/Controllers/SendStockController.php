@@ -37,6 +37,7 @@ class SendStockController extends Controller
             ->completed()
             ->orderBy('id', 'desc')
             ->get();
+        
         return response()->json($sendStok);
     }
 
@@ -74,11 +75,17 @@ class SendStockController extends Controller
 
             // If saving as draft, create draft without inventory changes
             if ($saveAsDraft) {
+                // Generate send stock number using same format as print function
+                $date = now()->format('Ymd');
+                $count = SendStock::count() + 1;
+                $sendStockNumber = "PS-{$date}-" . str_pad($count, 4, '0', STR_PAD_LEFT);
+
                 $sendStock = SendStock::create([
                     'user_id' => $user->id,
                     'from_warehouse' => $fromWarehouse,
                     'to_warehouse' => $toWarehouse,
                     'status' => 'draft',
+                    'send_stock_number' => $sendStockNumber,
                 ]);
 
                 $sendStockDetails = [];
@@ -138,12 +145,18 @@ class SendStockController extends Controller
                 return redirect()->back()->withErrors($stockErrors);
             }
 
+            // Generate send stock number using same format as print function
+            $date = now()->format('Ymd');
+            $count = SendStock::count() + 1;
+            $sendStockNumber = "PS-{$date}-" . str_pad($count, 4, '0', STR_PAD_LEFT);
+
             $sendStock = SendStock::create([
                 'user_id' => $user->id,
                 'from_warehouse' => $fromWarehouse,
                 'to_warehouse' => $toWarehouse,
                 'status' => 'completed',
                 'completed_at' => now(),
+                'send_stock_number' => $sendStockNumber,
             ]);
 
             $sendStockDetails = [];
@@ -400,7 +413,7 @@ class SendStockController extends Controller
     {
         $sendStock = SendStock::with('fromWarehouse', 'toWarehouse')->where('id', $id)->first();
         $sendStockDetail = SendStockDetail::with('product', 'unit')->where('send_stock_id', $id)->get();
-        $sendStockNumber = "PS-" . date('Ymd') . "-" . str_pad(SendStock::count() + 1, 4, '0', STR_PAD_LEFT);
+        $sendStockNumber = $sendStock->send_stock_number; // Use stored number instead of generating
         $totalQuantity = 0;
 
         $totalQuantity += $sendStockDetail->count();
