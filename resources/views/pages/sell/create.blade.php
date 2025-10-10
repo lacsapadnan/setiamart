@@ -269,7 +269,7 @@
                         <div class="mb-1">
                             <label for="subtotal" class="col-form-label">Subtotal</label>
                             <input type="text" name="subtotal" class="form-control" id="subtotal"
-                                value="{{ number_format($subtotal) }}" readonly />
+                                value="{{ number_format($subtotal, 0, ',', '.') }}" readonly />
                         </div>
 
                         <!-- Parent div with id="bayarDiv" -->
@@ -297,7 +297,8 @@
 
                         <div class="mb-1">
                             <label for="grandTotal" class="col-form-label">Grand Total</label>
-                            <input type="text" name="grand_total" class="form-control" id="grandTotal" readonly />
+                            <input type="text" name="grand_total" class="form-control" id="grandTotal" 
+                                value="" readonly />
                         </div>
 
                         <div class="mb-1">
@@ -363,7 +364,22 @@
     }
 
     function calculateTotal() {
-        var subtotal = parseFloat(document.getElementById('subtotal').value.replace(/[^0-9.-]+/g, '')) || 0;
+        // Parse Indonesian number format (dots as thousands separators)
+        var subtotalText = document.getElementById('subtotal').value.replace(/[.,]/g, '');
+        var subtotal = parseFloat(subtotalText) || 0;
+        
+        // If subtotal is 0, try to calculate from cart items
+        if (subtotal === 0 || isNaN(subtotal)) {
+            let calculatedSubtotal = 0;
+            $('tr[data-cart-id]').each(function() {
+                const subtotalText = $(this).find('.cart-subtotal').text().replace(/[.,]/g, '');
+                calculatedSubtotal += parseInt(subtotalText) || 0;
+            });
+            subtotal = calculatedSubtotal;
+            // Update the subtotal field with proper formatting
+            $('#subtotal').val(new Intl.NumberFormat('id-ID').format(subtotal));
+        }
+        
         var grandTotal = subtotal;
 
         var paymentMethod = document.getElementsByName('payment_method')[0].value;
@@ -1079,6 +1095,10 @@
         // On document ready
         KTUtil.onDOMContentLoaded(function() {
             KTDatatablesCart.init();
+            // Ensure totals are correct on initial load
+            setTimeout(function() {
+                calculateTotal();
+            }, 100); // Small delay to ensure DOM is fully ready
         });
 
         // Cart quantity update handlers
@@ -1109,12 +1129,18 @@
                         input.val(response.data.quantity);
                         row.find('.cart-subtotal').text(new Intl.NumberFormat('id-ID').format(response.data.subtotal));
                         
-                        // Recalculate grand total
-                        let grandTotal = 0;
+                        // Recalculate subtotal from all cart items
+                        let subtotal = 0;
                         $('tr[data-cart-id]').each(function() {
-                            const subtotalText = $(this).find('.cart-subtotal').text().replace(/\./g, '');
-                            grandTotal += parseInt(subtotalText) || 0;
+                            const subtotalText = $(this).find('.cart-subtotal').text().replace(/[^0-9]/g, '');
+                            subtotal += parseInt(subtotalText) || 0;
                         });
+                        
+                        // Update subtotal field
+                        $('#subtotal').val(new Intl.NumberFormat('id-ID').format(subtotal));
+                        
+                        // Call calculateTotal to update grand total and other fields
+                        calculateTotal();
                         
                         toastr.success('Quantity updated successfully');
                     }
