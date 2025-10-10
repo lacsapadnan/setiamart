@@ -705,14 +705,6 @@ class SellController extends Controller
             $inventory->quantity -= $newQuantity;
         }
 
-        // Check if inventory is sufficient
-        if ($inventory->quantity < 0) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Stok tidak mencukupi'
-            ], 400);
-        }
-
         $inventory->save();
 
         // Update cart quantity
