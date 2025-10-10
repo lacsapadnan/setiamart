@@ -222,6 +222,13 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('pindah-stok/cart', [SendStockController::class, 'addCart'])->name('pindah-stok.addCart');
     Route::post('pindah-stok-draft/cart', [SendStockDraftController::class, 'addCart'])->name('pindah-stok-draft.addCart');
     Route::post('penjualan-draft/cart', [SellDraftController::class, 'addCart'])->name('penjualan-draft.addCart');
+    Route::patch('penjualan/cart/{id}/quantity', [SellController::class, 'updateCartQuantity'])->name('penjualan.updateCartQuantity');
+    Route::patch('pembelian/cart/{id}/quantity', [PurchaseController::class, 'updateCartQuantity'])->name('pembelian.updateCartQuantity');
+    Route::patch('penjualan-draft/cart/{id}/quantity', [SellDraftController::class, 'updateCartQuantity'])->name('penjualan-draft.updateCartQuantity');
+    Route::patch('pindah-stok/cart/{id}/quantity', [SendStockController::class, 'updateCartQuantity'])->name('pindah-stok.updateCartQuantity');
+    Route::patch('pindah-stok-draft/cart/{id}/quantity', [SendStockDraftController::class, 'updateCartQuantity'])->name('pindah-stok-draft.updateCartQuantity');
+    Route::patch('penjualan-retur/cart/{id}/quantity', [SellReturController::class, 'updateCartQuantity'])->name('penjualan-retur.updateCartQuantity');
+    Route::patch('pembelian-retur/cart/{id}/quantity', [PurchaseReturController::class, 'updateCartQuantity'])->name('pembelian-retur.updateCartQuantity');
     Route::delete('penjualan/cart/hapus/{id}', [SellController::class, 'destroyCart'])->name('penjualan.destroyCart');
     Route::delete('pembelian/cart/hapus/{id}', [PurchaseController::class, 'destroyCart'])->name('pembelian.destroyCart');
     Route::delete('penjualan-retur/cart/hapus/{id}', [SellReturController::class, 'destroyCart'])->name('penjualan-retur.destroyCart');

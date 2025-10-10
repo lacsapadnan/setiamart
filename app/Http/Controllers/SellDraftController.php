@@ -452,4 +452,62 @@ class SellDraftController extends Controller
 
         return redirect()->back();
     }
+
+    public function updateCartQuantity(Request $request, $id)
+    {
+        $request->validate([
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        $sellCart = SellCartDraft::findOrFail($id);
+        $product = Product::find($sellCart->product_id);
+        $inventory = Inventory::where('product_id', $sellCart->product_id)
+            ->where('warehouse_id', auth()->user()->warehouse_id)
+            ->first();
+
+        // Calculate inventory adjustment
+        $oldQuantity = $sellCart->quantity;
+        $newQuantity = $request->quantity;
+
+        // Restore old quantity to inventory
+        if ($sellCart->unit_id == $product->unit_dus) {
+            $inventory->quantity += $oldQuantity * $product->dus_to_eceran;
+        } elseif ($sellCart->unit_id == $product->unit_pak) {
+            $inventory->quantity += $oldQuantity * $product->pak_to_eceran;
+        } elseif ($sellCart->unit_id == $product->unit_eceran) {
+            $inventory->quantity += $oldQuantity;
+        }
+
+        // Deduct new quantity from inventory
+        if ($sellCart->unit_id == $product->unit_dus) {
+            $inventory->quantity -= $newQuantity * $product->dus_to_eceran;
+        } elseif ($sellCart->unit_id == $product->unit_pak) {
+            $inventory->quantity -= $newQuantity * $product->pak_to_eceran;
+        } elseif ($sellCart->unit_id == $product->unit_eceran) {
+            $inventory->quantity -= $newQuantity;
+        }
+
+        // Check if inventory is sufficient
+        if ($inventory->quantity < 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Stok tidak mencukupi'
+            ], 400);
+        }
+
+        $inventory->save();
+
+        // Update cart quantity
+        $sellCart->quantity = $newQuantity;
+        $sellCart->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Quantity updated successfully',
+            'data' => [
+                'quantity' => $sellCart->quantity,
+                'subtotal' => $sellCart->price * $sellCart->quantity - $sellCart->diskon
+            ]
+        ]);
+    }
 }

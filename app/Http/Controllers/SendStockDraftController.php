@@ -393,6 +393,25 @@ class SendStockDraftController extends Controller
         }
     }
 
+    public function updateCartQuantity(Request $request, $id)
+    {
+        $request->validate([
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        $cart = SendStockCart::findOrFail($id);
+        $cart->quantity = $request->quantity;
+        $cart->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Quantity updated successfully',
+            'data' => [
+                'quantity' => $cart->quantity
+            ]
+        ]);
+    }
+
     /**
      * Add item to existing draft (for edit functionality).
      */

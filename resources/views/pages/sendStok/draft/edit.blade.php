@@ -105,11 +105,21 @@
                         </thead>
                         <tbody class="fw-semibold">
                             @foreach ($sendStockDetails as $detail)
-                            <tr class="odd">
+                            <tr class="odd" data-cart-id="{{ $detail->id }}">
                                 <td>{{ $loop->iteration }}</td>
                                 <td>{{ $detail->product->group }}</td>
                                 <td>{{ $detail->product->name }}</td>
-                                <td>{{ $detail->quantity }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <button type="button" class="btn btn-sm btn-light-primary btn-icon qty-decrease" data-cart-id="{{ $detail->id }}">
+                                            <i class="bi bi-dash"></i>
+                                        </button>
+                                        <input type="number" class="form-control form-control-sm text-center qty-input" value="{{ $detail->quantity }}" readonly style="width: 60px;">
+                                        <button type="button" class="btn btn-sm btn-light-primary btn-icon qty-increase" data-cart-id="{{ $detail->id }}">
+                                            <i class="bi bi-plus"></i>
+                                        </button>
+                                    </div>
+                                </td>
                                 <td>{{ $detail->unit->name }}</td>
                                 <td>
                                     <form action="{{ route('pindah-stok-draft.destroyCart', $detail->id) }}"
@@ -548,6 +558,45 @@
         }).then((result) => {
             if (result.isConfirmed) {
                 form.submit();
+            }
+        });
+    });
+
+    // Cart quantity update handlers
+    $(document).on('click', '.qty-increase, .qty-decrease', function() {
+        const button = $(this);
+        const cartId = button.data('cart-id');
+        const row = $(`tr[data-cart-id="${cartId}"]`);
+        const input = row.find('.qty-input');
+        const currentQty = parseInt(input.val());
+        const isIncrease = button.hasClass('qty-increase');
+        const newQty = isIncrease ? currentQty + 1 : Math.max(1, currentQty - 1);
+
+        if (newQty === currentQty) return;
+
+        button.prop('disabled', true);
+        row.find('.qty-increase, .qty-decrease').prop('disabled', true);
+
+        $.ajax({
+            url: `/pindah-stok-draft/cart/${cartId}/quantity`,
+            method: 'PATCH',
+            data: {
+                quantity: newQty,
+                _token: '{{ csrf_token() }}'
+            },
+            success: function(response) {
+                if (response.success) {
+                    input.val(response.data.quantity);
+                    toastr.success('Quantity updated successfully');
+                }
+            },
+            error: function(xhr) {
+                const message = xhr.responseJSON?.message || 'Failed to update quantity';
+                toastr.error(message);
+                input.val(currentQty);
+            },
+            complete: function() {
+                row.find('.qty-increase, .qty-decrease').prop('disabled', false);
             }
         });
     });

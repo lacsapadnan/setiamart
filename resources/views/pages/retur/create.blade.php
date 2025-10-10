@@ -101,13 +101,23 @@
                         </thead>
                         <tbody class="fw-semibold">
                             @forelse ($cart as $cart)
-                            <tr class="odd">
+                            <tr class="odd" data-cart-id="{{ $cart->id }}">
                                 <td>{{ $loop->iteration }}</td>
                                 <td>{{ $cart->product->name }}</td>
                                 <td>{{ $cart->unit->name }}</td>
-                                <td>{{ $cart->quantity }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <button type="button" class="btn btn-sm btn-light-primary btn-icon qty-decrease" data-cart-id="{{ $cart->id }}">
+                                            <i class="bi bi-dash"></i>
+                                        </button>
+                                        <input type="number" class="form-control form-control-sm text-center qty-input" value="{{ $cart->quantity }}" readonly style="width: 60px;">
+                                        <button type="button" class="btn btn-sm btn-light-primary btn-icon qty-increase" data-cart-id="{{ $cart->id }}">
+                                            <i class="bi bi-plus"></i>
+                                        </button>
+                                    </div>
+                                </td>
                                 <td>Rp{{ number_format($cart->price) }}</td>
-                                <td>Rp{{ number_format($cart->price * $cart->quantity) }}</td>
+                                <td class="cart-subtotal">Rp{{ number_format($cart->price * $cart->quantity) }}</td>
                                 <td>
                                     <form action="{{ route('penjualan-retur.destroyCart', $cart->id) }}" method="POST">
                                         @csrf
@@ -489,6 +499,46 @@
         // On document ready
         KTUtil.onDOMContentLoaded(function() {
             KTDatatablesExample.init();
+        });
+
+        // Cart quantity update handlers
+        $(document).on('click', '.qty-increase, .qty-decrease', function() {
+            const button = $(this);
+            const cartId = button.data('cart-id');
+            const row = $(`tr[data-cart-id="${cartId}"]`);
+            const input = row.find('.qty-input');
+            const currentQty = parseInt(input.val());
+            const isIncrease = button.hasClass('qty-increase');
+            const newQty = isIncrease ? currentQty + 1 : Math.max(1, currentQty - 1);
+
+            if (newQty === currentQty) return;
+
+            button.prop('disabled', true);
+            row.find('.qty-increase, .qty-decrease').prop('disabled', true);
+
+            $.ajax({
+                url: `/penjualan-retur/cart/${cartId}/quantity`,
+                method: 'PATCH',
+                data: {
+                    quantity: newQty,
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        input.val(response.data.quantity);
+                        row.find('.cart-subtotal').text('Rp' + new Intl.NumberFormat('id-ID').format(response.data.subtotal));
+                        toastr.success('Quantity updated successfully');
+                    }
+                },
+                error: function(xhr) {
+                    const message = xhr.responseJSON?.message || 'Failed to update quantity';
+                    toastr.error(message);
+                    input.val(currentQty);
+                },
+                complete: function() {
+                    row.find('.qty-increase, .qty-decrease').prop('disabled', false);
+                }
+            });
         });
 </script>
 @endpush

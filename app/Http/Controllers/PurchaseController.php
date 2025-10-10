@@ -616,6 +616,44 @@ class PurchaseController extends Controller
         return redirect()->back();
     }
 
+    public function updateCartQuantity(Request $request, $id)
+    {
+        $request->validate([
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        $purchaseCart = PurchaseCart::findOrFail($id);
+        $newQuantity = $request->quantity;
+
+        // Recalculate total price based on new quantity
+        $totalPrice = 0;
+        $priceUnit = $purchaseCart->price_unit;
+
+        if ($purchaseCart->discount_fix && $purchaseCart->discount_percent) {
+            $totalPrice = ($priceUnit * $newQuantity) - $purchaseCart->discount_fix - ($priceUnit * $newQuantity * $purchaseCart->discount_percent / 100);
+        } elseif ($purchaseCart->discount_fix) {
+            $totalPrice = ($priceUnit * $newQuantity) - $purchaseCart->discount_fix;
+        } elseif ($purchaseCart->discount_percent) {
+            $totalPrice = ($priceUnit * $newQuantity) - ($priceUnit * $newQuantity * $purchaseCart->discount_percent / 100);
+        } else {
+            $totalPrice = $priceUnit * $newQuantity;
+        }
+
+        // Update cart
+        $purchaseCart->quantity = $newQuantity;
+        $purchaseCart->total_price = $totalPrice;
+        $purchaseCart->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Quantity updated successfully',
+            'data' => [
+                'quantity' => $purchaseCart->quantity,
+                'subtotal' => $purchaseCart->total_price
+            ]
+        ]);
+    }
+
     public function debt()
     {
         $warehouses = Warehouse::all();

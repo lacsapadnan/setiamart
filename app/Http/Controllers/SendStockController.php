@@ -377,6 +377,25 @@ class SendStockController extends Controller
         return redirect()->back();
     }
 
+    public function updateCartQuantity(Request $request, $id)
+    {
+        $request->validate([
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        $cart = SendStockCart::findOrFail($id);
+        $cart->quantity = $request->quantity;
+        $cart->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Quantity updated successfully',
+            'data' => [
+                'quantity' => $cart->quantity
+            ]
+        ]);
+    }
+
     public function print($id)
     {
         $sendStock = SendStock::with('fromWarehouse', 'toWarehouse')->where('id', $id)->first();

@@ -1103,6 +1103,50 @@ class SellReturController extends Controller
         return redirect()->back();
     }
 
+    public function updateCartQuantity(Request $request, $id)
+    {
+        $request->validate([
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        $returCart = SellReturCart::findOrFail($id);
+        $product = Product::find($returCart->product_id);
+        $newQuantity = $request->quantity;
+
+        // Convert new quantity to eceran for validation
+        $newQuantityInEceran = $this->convertToEceran($newQuantity, $returCart->unit_id, $product);
+
+        // Calculate available return quantities
+        $totalRemainingEceran = $this->getTotalRemainingQuantityInEceran($returCart->sell_id, $returCart->product_id);
+        $totalReturnedEceran = $this->getTotalReturnedQuantityInEceran(auth()->id(), $returCart->sell_id, $returCart->product_id);
+        
+        // Add back the old quantity before checking (since it's currently in cart)
+        $oldQuantityInEceran = $this->convertToEceran($returCart->quantity, $returCart->unit_id, $product);
+        $availableForReturnEceran = $totalRemainingEceran - $totalReturnedEceran + $oldQuantityInEceran;
+
+        // Validate new quantity doesn't exceed available
+        if ($newQuantityInEceran > $availableForReturnEceran) {
+            $availableInRequestedUnit = $this->convertFromEceran($availableForReturnEceran, $returCart->unit_id, $product);
+            return response()->json([
+                'success' => false,
+                'message' => 'Jumlah melebihi yang tersedia untuk dikembalikan (' . number_format($availableInRequestedUnit, 2) . ')'
+            ], 400);
+        }
+
+        // Update cart quantity
+        $returCart->quantity = $newQuantity;
+        $returCart->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Quantity updated successfully',
+            'data' => [
+                'quantity' => $returCart->quantity,
+                'subtotal' => $returCart->price * $returCart->quantity
+            ]
+        ]);
+    }
+
     public function print($id)
     {
         $sellRetur = SellRetur::with('sell.customer', 'sell.details', 'warehouse', 'user')->where('id', $id)->first();
