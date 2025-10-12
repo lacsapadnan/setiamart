@@ -352,6 +352,9 @@
         document.getElementById('loading-overlay').style.visibility = 'hidden';
     }
 
+    // Flag to prevent recursive calls during auto-filling
+    let isAutoFilling = false;
+
     function formatNumber(input) {
         // Hapus semua karakter non-digit
         let value = input.value.replace(/\D/g, '');
@@ -383,9 +386,9 @@
         var grandTotal = subtotal;
 
         var paymentMethod = document.getElementsByName('payment_method')[0].value;
-        var transfer = parseFloat(document.getElementById('transfer').value.replace(/[^0-9.-]+/g, '')) || 0;
-        var cash = parseFloat(document.getElementById('cash').value.replace(/[^0-9.-]+/g, '')) || 0;
-        var bayar = parseFloat(document.getElementById('bayar').value.replace(/[^0-9.-]+/g, '')) || 0;
+        var transfer = parseFloat(document.getElementById('transfer').value.replace(/[.,]/g, '')) || 0;
+        var cash = parseFloat(document.getElementById('cash').value.replace(/[.,]/g, '')) || 0;
+        var bayar = parseFloat(document.getElementById('bayar').value.replace(/[.,]/g, '')) || 0;
 
         if (paymentMethod === 'split') {
             // Calculate grand total based on the sum of transfer and cash
@@ -409,7 +412,7 @@
     }
 
     function calculateKembali(paymentMethod, grandTotal, transfer, cash) {
-        var bayar = parseFloat(document.getElementById('bayar').value.replace(/[^0-9.-]+/g, '')) || 0;
+        var bayar = parseFloat(document.getElementById('bayar').value.replace(/[.,]/g, '')) || 0;
 
         if (paymentMethod === 'transfer' || paymentMethod === 'cash') {
             // For "Transfer" or "Cash," calculate the change as (transfer or cash) - grand total
@@ -466,6 +469,11 @@
     }
 
     function handleSplitPaymentInput(inputElement, inputType) {
+        // Prevent recursive calls during auto-filling
+        if (isAutoFilling) {
+            return;
+        }
+
         // Only handle auto-calculation for split payment
         const paymentMethod = document.getElementsByName('payment_method')[0].value;
         if (paymentMethod !== 'split') {
@@ -474,8 +482,12 @@
         }
 
         // Use subtotal as the base for calculation (this is the grand total we need to reach)
-        const subtotal = parseFloat(document.getElementById('subtotal').value.replace(/[^0-9.-]+/g, '')) || 0;
-        const inputValue = parseFloat(inputElement.value.replace(/[^0-9.-]+/g, '')) || 0;
+        // Handle both dot (.) and comma (,) as thousands separators
+        const subtotalText = document.getElementById('subtotal').value.replace(/[.,]/g, '');
+        const subtotal = parseFloat(subtotalText) || 0;
+        
+        const inputValueText = inputElement.value.replace(/[.,]/g, '');
+        const inputValue = parseFloat(inputValueText) || 0;
 
         // Calculate remaining amount needed
         const remainingAmount = Math.max(0, subtotal - inputValue);
@@ -492,10 +504,14 @@
                 if (remainingAmount > 0) {
                     // Format the number with thousand separators (commas)
                     let formattedValue = remainingAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                    isAutoFilling = true;
                     cashInput.value = formattedValue;
+                    isAutoFilling = false;
                 } else if (inputValue >= subtotal) {
                     // If transfer covers the full amount, clear cash
+                    isAutoFilling = true;
                     cashInput.value = '';
+                    isAutoFilling = false;
                 }
             } else if (inputType === 'cash') {
                 // User entered cash amount, calculate remaining for transfer
@@ -505,11 +521,28 @@
                 if (remainingAmount > 0) {
                     // Format the number with thousand separators (commas)
                     let formattedValue = remainingAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                    isAutoFilling = true;
                     transferInput.value = formattedValue;
+                    isAutoFilling = false;
                 } else if (inputValue >= subtotal) {
                     // If cash covers the full amount, clear transfer
+                    isAutoFilling = true;
                     transferInput.value = '';
+                    isAutoFilling = false;
                 }
+            }
+        } else {
+            // If input value is 0 or empty, clear the other field
+            if (inputType === 'transfer') {
+                const cashInput = document.getElementById('cash');
+                isAutoFilling = true;
+                cashInput.value = '';
+                isAutoFilling = false;
+            } else if (inputType === 'cash') {
+                const transferInput = document.getElementById('transfer');
+                isAutoFilling = true;
+                transferInput.value = '';
+                isAutoFilling = false;
             }
         }
 
@@ -534,9 +567,9 @@
 
     function validateAndSetPaymentMethod() {
         const paymentMethodSelect = document.getElementsByName('payment_method')[0];
-        const cash = parseFloat(document.getElementById('cash').value.replace(/[^0-9.-]+/g, '')) || 0;
-        const transfer = parseFloat(document.getElementById('transfer').value.replace(/[^0-9.-]+/g, '')) || 0;
-        const bayar = parseFloat(document.getElementById('bayar').value.replace(/[^0-9.-]+/g, '')) || 0;
+        const cash = parseFloat(document.getElementById('cash').value.replace(/[.,]/g, '')) || 0;
+        const transfer = parseFloat(document.getElementById('transfer').value.replace(/[.,]/g, '')) || 0;
+        const bayar = parseFloat(document.getElementById('bayar').value.replace(/[.,]/g, '')) || 0;
 
         // If payment method is not selected but we have payment amounts, set it automatically
         if (!paymentMethodSelect.value) {
@@ -585,8 +618,8 @@
         var transfer = document.getElementById('transfer').value;
         var grandTotal = document.getElementById('grandTotal').value;
 
-        cash = parseInt(cash.replace(/[^0-9.-]+/g, '')) || 0;
-        transfer = parseInt(transfer.replace(/[^0-9.-]+/g, '')) || 0;
+        cash = parseInt(cash.replace(/[.,]/g, '')) || 0;
+        transfer = parseInt(transfer.replace(/[.,]/g, '')) || 0;
 
         // Disable submit buttons to prevent double submission
         const submitButtons = document.querySelectorAll('button[type="button"]');
