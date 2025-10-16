@@ -13,10 +13,13 @@
         "laravel/tinker": "^2.8",
         "maatwebsite/excel": "^3.1",
         "mike42/escpos-php": "^4.0",
+        "milon/barcode": "^12.0",
+        "picqer/php-barcode-generator": "^3.2",
         "predis/predis": "^3.0",
         "sentry/sentry-laravel": "^4.15",
         "spatie/laravel-activitylog": "^4.10",
         "spatie/laravel-permission": "^6.20",
+        "webklex/laravel-pdfmerger": "^1.3",
         "yajra/laravel-datatables-oracle": "^10.11"
     },
     "require-dev": {

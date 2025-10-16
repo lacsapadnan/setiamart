@@ -272,6 +272,16 @@ Route::group(['middleware' => ['auth']], function () {
     Route::get('/activity-log/subject-types', [ActivityLogController::class, 'getSubjectTypes'])->name('activity-log.subject-types');
     Route::get('/activity-log/{id}', [ActivityLogController::class, 'show'])->name('activity-log.show');
     Route::delete('/activity-log/{id}', [ActivityLogController::class, 'destroy'])->name('activity-log.destroy');
+
+    // Barcode Produk
+    Route::post('produk/generate-barcode', [ProductController::class, 'generateBarcodePDF'])->name('produk.generate-barcode');
+    Route::get('produk/download-barcode/{filename}', [ProductController::class, 'downloadBarcodePDF'])->name('produk.download-barcode');
+    Route::get('/barcode/download/{filename}', [ProductController::class, 'downloadBarcodePDF'])
+        ->name('barcode.download');
+    Route::get('/barcode/list', [ProductController::class, 'listBarcodePDFs'])
+        ->name('barcode.list');
+    Route::delete('/barcode/delete/{filename}', [ProductController::class, 'deleteBarcodePDF'])
+        ->name('barcode.delete');
 });
 
 require __DIR__ . '/auth.php';

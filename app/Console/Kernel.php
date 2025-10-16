@@ -16,6 +16,9 @@ class Kernel extends ConsoleKernel
 
         // Clean up old activity logs weekly (keeping 90 days of logs)
         $schedule->command('activitylog:clean --days=90')->weekly();
+
+        // Clean up barcode files older than 1 day (runs daily at 2:00 AM)
+        $schedule->command('barcode:cleanup')->dailyAt('02:00');
     }
 
     /**
