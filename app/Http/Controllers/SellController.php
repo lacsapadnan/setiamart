@@ -597,6 +597,11 @@ class SellController extends Controller
 
     private function processCartItem($productId, $quantity, $unitId, $price, $discount)
     {
+        // Cast to numeric types to prevent string multiplication errors
+        $quantity = (int) $quantity;
+        $price = (float) str_replace(',', '', $price); // Remove commas if present
+        $discount = (float) str_replace(',', '', $discount);
+
         // Calculate the total price based on the unit price and quantity
         $totalPrice = $price * $quantity;
 
@@ -627,10 +632,18 @@ class SellController extends Controller
 
     private function decreaseInventory($productId, $quantity, $unitId)
     {
+        // Cast to int to prevent type errors
+        $quantity = (int) $quantity;
+
         $product = Product::find($productId);
         $inventory = Inventory::where('product_id', $productId)
             ->where('warehouse_id', auth()->user()->warehouse_id)
             ->first();
+
+        // Check if product and inventory exist
+        if (!$product || !$inventory) {
+            return;
+        }
 
         if ($unitId == $product->unit_dus) {
             $inventory->quantity -= $quantity * $product->dus_to_eceran;
