@@ -164,7 +164,7 @@ class SendStockController extends Controller
             foreach ($carts as $cart) {
                 $product = $cart->product;
                 $unit = $cart->unit_id;
-                $quantity = $cart->quantity;
+                $quantity = (int) $cart->quantity; // Cast to int to prevent type error
 
                 $quantityEceran = match ($unit) {
                     $product->unit_dus => $quantity * $product->dus_to_eceran,
@@ -250,7 +250,7 @@ class SendStockController extends Controller
         foreach ($sendStockDetails as $detail) {
             $product = $detail->product;
             $unit = $detail->unit_id;
-            $quantity = $detail->quantity;
+            $quantity = (int) $detail->quantity; // Cast to int to prevent type error
 
             // Convert quantity to eceran
             $quantityEceran = match ($unit) {
@@ -364,6 +364,9 @@ class SendStockController extends Controller
 
     private function processCartItem($productId, $quantity, $unitId)
     {
+        // Cast to int to prevent type errors
+        $quantity = (int) $quantity;
+
         $existingCart = SendStockCart::where('user_id', auth()->id())
             ->where('product_id', $productId)
             ->where('unit_id', $unitId)
@@ -385,9 +388,14 @@ class SendStockController extends Controller
     public function destroyCart($id)
     {
         $cart = SendStockCart::find($id);
+
+        if (!$cart) {
+            return redirect()->back()->with('error', 'Item keranjang tidak ditemukan');
+        }
+
         $cart->delete();
 
-        return redirect()->back();
+        return redirect()->back()->with('success', 'Item berhasil dihapus dari keranjang');
     }
 
     public function updateCartQuantity(Request $request, $id)
