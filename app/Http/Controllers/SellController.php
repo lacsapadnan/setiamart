@@ -649,26 +649,51 @@ class SellController extends Controller
             ->where('id', $id)
             ->first();
 
+        // Check if cart item exists
+        if (!$sellCart) {
+            if ($request->ajax()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Item keranjang tidak ditemukan'
+                ], 404);
+            }
+            return redirect()->back()->with('error', 'Item keranjang tidak ditemukan');
+        }
+
+        // Store values before deletion
+        $unitId = $sellCart->unit_id;
+        $productId = $sellCart->product_id;
+        $quantity = $sellCart->quantity;
+
+        // Delete the cart item
         $sellCart->delete();
 
-        // check unit id is unit_dus, unit_pak, or unit_eceran
-        $unitId = $sellCart->unit_id;
-        $product = Product::find($sellCart->product_id);
-        $inventory = Inventory::where('product_id', $sellCart->product_id)
+        // Restore inventory
+        $product = Product::find($productId);
+        $inventory = Inventory::where('product_id', $productId)
             ->where('warehouse_id', auth()->user()->warehouse_id)
             ->first();
 
-        if ($unitId == $product->unit_dus) {
-            $inventory->quantity += $sellCart->quantity * $product->dus_to_eceran;
-        } elseif ($unitId == $product->unit_pak) {
-            $inventory->quantity += $sellCart->quantity * $product->pak_to_eceran;
-        } elseif ($unitId == $product->unit_eceran) {
-            $inventory->quantity += $sellCart->quantity;
+        if ($inventory && $product) {
+            if ($unitId == $product->unit_dus) {
+                $inventory->quantity += $quantity * $product->dus_to_eceran;
+            } elseif ($unitId == $product->unit_pak) {
+                $inventory->quantity += $quantity * $product->pak_to_eceran;
+            } elseif ($unitId == $product->unit_eceran) {
+                $inventory->quantity += $quantity;
+            }
+
+            $inventory->save();
         }
 
-        $inventory->save();
+        if ($request->ajax()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Item berhasil dihapus dari keranjang'
+            ]);
+        }
 
-        return redirect()->back();
+        return redirect()->back()->with('success', 'Item berhasil dihapus dari keranjang');
     }
 
     public function updateCartQuantity(Request $request, $id)
