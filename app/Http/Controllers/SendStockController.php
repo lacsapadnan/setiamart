@@ -304,27 +304,57 @@ class SendStockController extends Controller
                 // Handle bulk items
                 $requests = $request->input('requests');
 
-                foreach ($requests as $inputRequest) {
+                if (empty($requests) || !is_array($requests)) {
+                    return response()->json(['error' => 'No items provided'], 400);
+                }
+
+                $itemsAdded = 0;
+
+                foreach ($requests as $index => $inputRequest) {
+                    if (!isset($inputRequest['product_id'])) {
+                        continue; // Skip if no product_id
+                    }
+
                     $productId = $inputRequest['product_id'];
 
-                    // Process quantity_dus if it exists
-                    if (isset($inputRequest['quantity_dus']) && $inputRequest['quantity_dus'] > 0) {
-                        $this->processCartItem($productId, $inputRequest['quantity_dus'], $inputRequest['unit_dus']);
+                    // Process quantity_dus if it exists and is greater than 0
+                    if (isset($inputRequest['quantity_dus']) && !empty($inputRequest['quantity_dus'])) {
+                        $qtyDus = (int) $inputRequest['quantity_dus'];
+                        if ($qtyDus > 0 && isset($inputRequest['unit_dus'])) {
+                            $this->processCartItem($productId, $qtyDus, $inputRequest['unit_dus']);
+                            $itemsAdded++;
+                        }
                     }
 
-                    // Process quantity_pak if it exists
-                    if (isset($inputRequest['quantity_pak']) && $inputRequest['quantity_pak'] > 0) {
-                        $this->processCartItem($productId, $inputRequest['quantity_pak'], $inputRequest['unit_pak']);
+                    // Process quantity_pak if it exists and is greater than 0
+                    if (isset($inputRequest['quantity_pak']) && !empty($inputRequest['quantity_pak'])) {
+                        $qtyPak = (int) $inputRequest['quantity_pak'];
+                        if ($qtyPak > 0 && isset($inputRequest['unit_pak'])) {
+                            $this->processCartItem($productId, $qtyPak, $inputRequest['unit_pak']);
+                            $itemsAdded++;
+                        }
                     }
 
-                    // Process quantity_eceran if it exists
-                    if (isset($inputRequest['quantity_eceran']) && $inputRequest['quantity_eceran'] > 0) {
-                        $this->processCartItem($productId, $inputRequest['quantity_eceran'], $inputRequest['unit_eceran']);
+                    // Process quantity_eceran if it exists and is greater than 0
+                    if (isset($inputRequest['quantity_eceran']) && !empty($inputRequest['quantity_eceran'])) {
+                        $qtyEceran = (int) $inputRequest['quantity_eceran'];
+                        if ($qtyEceran > 0 && isset($inputRequest['unit_eceran'])) {
+                            $this->processCartItem($productId, $qtyEceran, $inputRequest['unit_eceran']);
+                            $itemsAdded++;
+                        }
                     }
                 }
 
                 DB::commit();
-                return response()->json(['success' => 'Items added to cart successfully.'], 200);
+
+                if ($itemsAdded === 0) {
+                    return response()->json(['error' => 'No valid items to add. Please enter quantities greater than 0.'], 400);
+                }
+
+                return response()->json([
+                    'success' => 'Items added to cart successfully.',
+                    'items_added' => $itemsAdded
+                ], 200);
             } else {
                 // Handle single item (original format)
                 $productId = $request->product_id;
@@ -335,24 +365,40 @@ class SendStockController extends Controller
                     return redirect()->back()->with('error', 'Product not found');
                 }
 
+                $itemsAdded = 0;
+
                 // Process each unit type
                 if ($request->has('quantity_dus') && $request->quantity_dus > 0) {
                     $this->processCartItem($productId, $request->quantity_dus, $product->unit_dus);
+                    $itemsAdded++;
                 }
 
                 if ($request->has('quantity_pak') && $request->quantity_pak > 0) {
                     $this->processCartItem($productId, $request->quantity_pak, $product->unit_pak);
+                    $itemsAdded++;
                 }
 
                 if ($request->has('quantity_eceran') && $request->quantity_eceran > 0) {
                     $this->processCartItem($productId, $request->quantity_eceran, $product->unit_eceran);
+                    $itemsAdded++;
                 }
 
                 DB::commit();
+
+                if ($itemsAdded === 0) {
+                    return redirect()->back()->with('error', 'Silakan masukkan quantity yang valid');
+                }
+
                 return redirect()->back()->with('success', 'Produk berhasil dimasukan ke keranjang');
             }
         } catch (\Exception $e) {
             DB::rollBack();
+
+            // Log the error for debugging
+            \Log::error('SendStock addCart error: ' . $e->getMessage(), [
+                'request' => $request->all(),
+                'trace' => $e->getTraceAsString()
+            ]);
 
             if ($request->has('requests')) {
                 return response()->json(['error' => 'Failed to add items to cart: ' . $e->getMessage()], 500);

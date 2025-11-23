@@ -339,41 +339,62 @@
                 });
 
                 $(table).on('click', '.btn-submit', function() {
-                    var inputRequests = [];
+                    var clickedRow = $(this).closest('tr');
+                    var rowIndex = datatable.row(clickedRow).index();
+                    var rowData = datatable.row(clickedRow).data();
+                    
+                    var quantityDus = clickedRow.find('input[name="quantity_dus"]').val();
+                    var quantityPak = clickedRow.find('input[name="quantity_pak"]').val();
+                    var quantityEceran = clickedRow.find('input[name="quantity_eceran"]').val();
 
-                    $(table).find('tbody tr').each(function() {
-                        var productId = $(this).find('.btn-submit').data('product-id');
-                        var quantityDus = $(this).find('input[name="quantity_dus"]').val();
-                        var quantityPak = $(this).find('input[name="quantity_pak"]').val();
-                        var quantityEceran = $(this).find('input[name="quantity_eceran"]').val();
+                    // Check if any quantity is filled
+                    if (!quantityDus && !quantityPak && !quantityEceran) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Tidak ada quantity',
+                            text: 'Silakan isi quantity terlebih dahulu'
+                        });
+                        return;
+                    }
 
-                        if (quantityDus || quantityPak || quantityEceran) { // Only submit if any quantity is filled
-                            var inputRequest = {
-                                product_id: productId,
-                                quantity_dus: quantityDus,
-                                quantity_pak: quantityPak,
-                                quantity_eceran: quantityEceran,
-                            };
-
-                            inputRequests.push(inputRequest);
-                        }
-                    });
+                    var requests = [{
+                        product_id: rowData.product.id,
+                        unit_dus: rowData.product.unit_dus,
+                        unit_pak: rowData.product.unit_pak,
+                        unit_eceran: rowData.product.unit_eceran,
+                        quantity_dus: quantityDus || 0,
+                        quantity_pak: quantityPak || 0,
+                        quantity_eceran: quantityEceran || 0
+                    }];
 
                     // Send AJAX request
                     $.ajax({
                         url: '{{ route('pindah-stok.addCart') }}',
                         type: 'POST',
-                        contentType: 'application/json',
-                        data: JSON.stringify({ items: inputRequests }),
+                        data: {
+                            requests: requests
+                        },
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                         },
                         success: function(response) {
-                            location.reload();
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Berhasil!',
+                                text: 'Item berhasil ditambahkan ke keranjang',
+                                timer: 1500,
+                                showConfirmButton: false
+                            }).then(() => {
+                                location.reload();
+                            });
                         },
                         error: function(xhr, status, error) {
-                            var errorMessage = xhr.responseJSON.message || 'Terjadi kesalahan, silakan coba lagi.';
-                            alert(errorMessage);
+                            var errorMessage = xhr.responseJSON?.error || xhr.responseJSON?.message || 'Terjadi kesalahan, silakan coba lagi.';
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error!',
+                                text: errorMessage
+                            });
                         }
                     });
                 });
