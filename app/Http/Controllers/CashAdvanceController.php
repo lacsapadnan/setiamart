@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CashAdvanceRejectRequest;
+use App\Http\Requests\CashAdvanceStoreRequest;
+use App\Http\Requests\CashAdvanceUpdateRequest;
 use App\Models\CashAdvance;
 use App\Models\CashAdvancePayment;
 use App\Models\Employee;
 use App\Models\Warehouse;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Http\Requests\CashAdvanceStoreRequest;
-use App\Http\Requests\CashAdvanceUpdateRequest;
-use App\Http\Requests\CashAdvanceRejectRequest;
-use Carbon\Carbon;
 
 class CashAdvanceController extends Controller
 {
@@ -32,6 +32,7 @@ class CashAdvanceController extends Controller
     {
         $warehouses = Warehouse::orderBy('name')->get();
         $employees = Employee::orderBy('name')->get();
+
         return view('pages.cash-advance.index', compact('warehouses', 'employees'));
     }
 
@@ -45,7 +46,7 @@ class CashAdvanceController extends Controller
             ->orderBy('created_at', 'desc');
 
         // Role-based filtering
-        if (!$isMaster) {
+        if (! $isMaster) {
             $query->where('warehouse_id', auth()->user()->warehouse_id);
         }
 
@@ -73,7 +74,7 @@ class CashAdvanceController extends Controller
         $cashAdvances = $query->get();
 
         return response()->json([
-            'data' => $cashAdvances
+            'data' => $cashAdvances,
         ]);
     }
 
@@ -119,10 +120,13 @@ class CashAdvanceController extends Controller
             }
 
             DB::commit();
+
             return redirect()->route('kasbon.index')->with('success', 'Kasbon berhasil dibuat');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->withErrors(['error' => 'Terjadi kesalahan: ' . $e->getMessage()])->withInput();
+            report($e);
+
+            return redirect()->back()->withErrors(['error' => 'Terjadi kesalahan saat membuat kasbon.'])->withInput();
         }
     }
 
@@ -132,6 +136,7 @@ class CashAdvanceController extends Controller
     public function show(string $id)
     {
         $cashAdvance = CashAdvance::with(['employee', 'warehouse', 'approvedBy', 'payments.processedBy'])->findOrFail($id);
+
         return view('pages.cash-advance.show', compact('cashAdvance'));
     }
 
@@ -192,10 +197,13 @@ class CashAdvanceController extends Controller
             }
 
             DB::commit();
+
             return redirect()->route('kasbon.index')->with('success', 'Kasbon berhasil diperbarui');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->withErrors(['error' => 'Terjadi kesalahan: ' . $e->getMessage()])->withInput();
+            report($e);
+
+            return redirect()->back()->withErrors(['error' => 'Terjadi kesalahan saat memperbarui kasbon.'])->withInput();
         }
     }
 
@@ -207,7 +215,7 @@ class CashAdvanceController extends Controller
         $cashAdvance = CashAdvance::findOrFail($id);
 
         // Ensure status is properly cast to string for comparison
-        $status = (string)$cashAdvance->status;
+        $status = (string) $cashAdvance->status;
 
         // Only allow deletion if status is pending or rejected
         if ($status !== 'pending' && $status !== 'rejected') {
@@ -218,9 +226,12 @@ class CashAdvanceController extends Controller
             $cashAdvance->delete();
             // Set session flash message for SweetAlert
             session()->flash('success', 'Kasbon berhasil dihapus');
+
             return response()->json(['success' => true, 'message' => 'Kasbon berhasil dihapus']);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan: ' . $e->getMessage()]);
+            report($e);
+
+            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan saat menghapus kasbon.']);
         }
     }
 
@@ -242,9 +253,12 @@ class CashAdvanceController extends Controller
 
             // Set session flash message for SweetAlert
             session()->flash('success', 'Kasbon berhasil disetujui');
+
             return response()->json(['success' => true, 'message' => 'Kasbon berhasil disetujui']);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan: ' . $e->getMessage()]);
+            report($e);
+
+            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan saat menyetujui kasbon.']);
         }
     }
 
@@ -267,9 +281,12 @@ class CashAdvanceController extends Controller
 
             // Set session flash message for SweetAlert
             session()->flash('success', 'Kasbon berhasil ditolak');
+
             return response()->json(['success' => true, 'message' => 'Kasbon berhasil ditolak']);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan: ' . $e->getMessage()]);
+            report($e);
+
+            return response()->json(['success' => false, 'message' => 'Terjadi kesalahan saat menolak kasbon.']);
         }
     }
 
@@ -278,7 +295,7 @@ class CashAdvanceController extends Controller
      */
     private function createInstallmentPayments(CashAdvance $cashAdvance)
     {
-        if ($cashAdvance->type !== 'installment' || !$cashAdvance->installment_count) {
+        if ($cashAdvance->type !== 'installment' || ! $cashAdvance->installment_count) {
             return;
         }
 

@@ -38,6 +38,7 @@ class PurchaseController extends Controller
         $masters = User::role('master')->get();
         $warehouses = Warehouse::all();
         $users = User::all();
+
         return view('pages.purchase.index', compact('masters', 'warehouses', 'users'));
     }
 
@@ -53,11 +54,11 @@ class PurchaseController extends Controller
 
             $defaultDate = now()->format('Y-m-d');
 
-            if (!$fromDate) {
+            if (! $fromDate) {
                 $fromDate = $defaultDate;
             }
 
-            if (!$toDate) {
+            if (! $toDate) {
                 $toDate = $defaultDate;
             }
 
@@ -90,10 +91,11 @@ class PurchaseController extends Controller
 
             return response()->json($purchases);
         } catch (\Exception $e) {
+            report($e);
+
             return response()->json([
                 'error' => true,
-                'message' => 'Terjadi kesalahan saat mengambil data pembelian: ' . $e->getMessage(),
-                'details' => config('app.debug') ? $e->getTraceAsString() : null
+                'message' => 'Terjadi kesalahan saat mengambil data pembelian.',
             ], 500);
         }
     }
@@ -139,7 +141,7 @@ class PurchaseController extends Controller
         $formattedOrderNumber = str_pad($newOrderNumber, 4, '0', STR_PAD_LEFT);
 
         // Generate the order number string with warehouseId in the middle
-        $orderNumber = "PL-" . $today . "-" . $warehouseId . auth()->id() . "-" . $formattedOrderNumber;
+        $orderNumber = 'PL-'.$today.'-'.$warehouseId.auth()->id().'-'.$formattedOrderNumber;
         $cart = PurchaseCart::with('product.unit_dus', 'product.unit_pak', 'product.unit_eceran')->where('user_id', auth()->id())->get();
         $subtotal = 0;
         foreach ($cart as $c) {
@@ -158,16 +160,16 @@ class PurchaseController extends Controller
 
             $existingCart = PurchaseCart::where('user_id', auth()->id())->get();
 
-            $subtotal = (int)str_replace([',', '.'], '', $request->subtotal ?? 0);
-            $remaint = (int)str_replace([',', '.'], '', $request->remaint ?? 0);
-            $potongan = (int)str_replace([',', '.'], '', $request->potongan ?? 0);
+            $subtotal = (int) str_replace([',', '.'], '', $request->subtotal ?? 0);
+            $remaint = (int) str_replace([',', '.'], '', $request->remaint ?? 0);
+            $potongan = (int) str_replace([',', '.'], '', $request->potongan ?? 0);
             $grandTotal = (int) str_replace([',', '.'], '', $request->grand_total);
 
             // Get payment method first
             $paymentMethod = $request->payment_method;
-            $cash = (int)str_replace([',', '.'], '', $request->cash ?? 0);
-            $transfer = (int)str_replace([',', '.'], '', $request->transfer ?? 0);
-            $bayar = (int)str_replace([',', '.'], '', $request->pay ?? 0);
+            $cash = (int) str_replace([',', '.'], '', $request->cash ?? 0);
+            $transfer = (int) str_replace([',', '.'], '', $request->transfer ?? 0);
+            $bayar = (int) str_replace([',', '.'], '', $request->pay ?? 0);
 
             // Calculate actual payment amount based on payment method
             $pay = 0;
@@ -247,28 +249,28 @@ class PurchaseController extends Controller
                     if ($cart->unit_id == $product->unit_dus) {
                         if ($warehouse && $warehouse->isOutOfTown) {
                             if ($product->dus_to_eceran <= 0) {
-                                Log::error('DivisionByZeroError: Product ID ' . $product->id . ' has dus_to_eceran = ' . $product->dus_to_eceran . ' (Product: ' . $product->name . ')');
-                                throw new \DivisionByZeroError('Product ' . $product->name . ' (ID: ' . $product->id . ') has invalid dus_to_eceran value: ' . $product->dus_to_eceran);
+                                Log::error('DivisionByZeroError: Product ID '.$product->id.' has dus_to_eceran = '.$product->dus_to_eceran.' (Product: '.$product->name.')');
+                                throw new \DivisionByZeroError('Product '.$product->name.' (ID: '.$product->id.') has invalid dus_to_eceran value: '.$product->dus_to_eceran);
                             }
                             $product->lastest_price_eceran_out_of_town = $cart->price_unit / $product->dus_to_eceran;
                         } else {
                             if ($product->dus_to_eceran <= 0) {
-                                Log::error('DivisionByZeroError: Product ID ' . $product->id . ' has dus_to_eceran = ' . $product->dus_to_eceran . ' (Product: ' . $product->name . ')');
-                                throw new \DivisionByZeroError('Product ' . $product->name . ' (ID: ' . $product->id . ') has invalid dus_to_eceran value: ' . $product->dus_to_eceran);
+                                Log::error('DivisionByZeroError: Product ID '.$product->id.' has dus_to_eceran = '.$product->dus_to_eceran.' (Product: '.$product->name.')');
+                                throw new \DivisionByZeroError('Product '.$product->name.' (ID: '.$product->id.') has invalid dus_to_eceran value: '.$product->dus_to_eceran);
                             }
                             $product->lastest_price_eceran = $cart->price_unit / $product->dus_to_eceran;
                         }
                     } elseif ($cart->unit_id == $product->unit_pak) {
                         if ($warehouse && $warehouse->isOutOfTown) {
                             if ($product->pak_to_eceran <= 0) {
-                                Log::error('DivisionByZeroError: Product ID ' . $product->id . ' has pak_to_eceran = ' . $product->pak_to_eceran . ' (Product: ' . $product->name . ')');
-                                throw new \DivisionByZeroError('Product ' . $product->name . ' (ID: ' . $product->id . ') has invalid pak_to_eceran value: ' . $product->pak_to_eceran);
+                                Log::error('DivisionByZeroError: Product ID '.$product->id.' has pak_to_eceran = '.$product->pak_to_eceran.' (Product: '.$product->name.')');
+                                throw new \DivisionByZeroError('Product '.$product->name.' (ID: '.$product->id.') has invalid pak_to_eceran value: '.$product->pak_to_eceran);
                             }
                             $product->lastest_price_eceran_out_of_town = $cart->price_unit / $product->pak_to_eceran;
                         } else {
                             if ($product->pak_to_eceran <= 0) {
-                                Log::error('DivisionByZeroError: Product ID ' . $product->id . ' has pak_to_eceran = ' . $product->pak_to_eceran . ' (Product: ' . $product->name . ')');
-                                throw new \DivisionByZeroError('Product ' . $product->name . ' (ID: ' . $product->id . ') has invalid pak_to_eceran value: ' . $product->pak_to_eceran);
+                                Log::error('DivisionByZeroError: Product ID '.$product->id.' has pak_to_eceran = '.$product->pak_to_eceran.' (Product: '.$product->name.')');
+                                throw new \DivisionByZeroError('Product '.$product->name.' (ID: '.$product->id.') has invalid pak_to_eceran value: '.$product->pak_to_eceran);
                             }
                             $product->lastest_price_eceran = $cart->price_unit / $product->pak_to_eceran;
                         }
@@ -280,7 +282,7 @@ class PurchaseController extends Controller
                         }
                     }
                 } catch (\DivisionByZeroError $e) {
-                    Log::error('DivisionByZeroError in PurchaseController::store: ' . $e->getMessage());
+                    Log::error('DivisionByZeroError in PurchaseController::store: '.$e->getMessage());
                     throw $e;
                 }
                 $product->update();
@@ -332,7 +334,7 @@ class PurchaseController extends Controller
                     'price' => $cart->price_unit,
                     'for' => 'MASUK',
                     'type' => 'PEMBELIAN',
-                    'description' => 'Pembelian ' . $request->order_number,
+                    'description' => 'Pembelian '.$request->order_number,
                 ]);
             }
 
@@ -341,9 +343,7 @@ class PurchaseController extends Controller
 
             // Fix: Check if we have any payment amount, not just the generic pay field
 
-
             if ($pay > 0) {
-
 
                 if ($paymentMethod) {
                     // Change back to using handlePurchasePayment
@@ -363,8 +363,9 @@ class PurchaseController extends Controller
 
             return redirect()->route('pembelian.index')->with('success', 'Pembelian berhasil ditambahkan');
         } catch (\Exception $e) {
-            // show the error message
-            return redirect()->back()->withErrors(['error' => $e->getMessage()]);
+            report($e);
+
+            return redirect()->back()->withErrors(['error' => 'Terjadi kesalahan saat menyimpan pembelian.']);
         }
     }
 
@@ -381,7 +382,7 @@ class PurchaseController extends Controller
             'details.product.unit_dus',
             'details.product.unit_pak',
             'details.product.unit_eceran',
-            'details.unit'
+            'details.unit',
         ]);
 
         // Apply warehouse filter for non-master users
@@ -391,7 +392,7 @@ class PurchaseController extends Controller
 
         $purchase = $query->find($id);
 
-        if (!$purchase) {
+        if (! $purchase) {
             return response()->json(['error' => 'Data pembelian tidak ditemukan atau Anda tidak memiliki akses'], 404);
         }
 
@@ -414,7 +415,7 @@ class PurchaseController extends Controller
             'details.product:id,name,price_sell_dus,unit_dus,unit_pak,unit_eceran,dus_to_eceran,pak_to_eceran',
             'details.unit:id,name',
             'supplier:id,name',
-            'warehouse:id,name'
+            'warehouse:id,name',
         ])->findOrFail($id);
 
         // Only get suppliers for the dropdown
@@ -480,7 +481,7 @@ class PurchaseController extends Controller
 
                 // Format price for new inventory
                 $formattedPriceUnit = $price_units[$index];
-                $numericPriceUnit = (int)str_replace(['Rp. ', '.', ','], '', $formattedPriceUnit);
+                $numericPriceUnit = (int) str_replace(['Rp. ', '.', ','], '', $formattedPriceUnit);
 
                 // Apply new inventory
                 $this->applyNewInventoryChange(
@@ -499,17 +500,20 @@ class PurchaseController extends Controller
                 'supplier_id' => $request->supplier_id,
                 'subtotal' => $subtotal,
                 'tax' => $tax,
-                'grand_total' => $grand_total
+                'grand_total' => $grand_total,
             ]);
 
             // 5. Update purchase details
             $this->updatePurchaseDetails($purchase, $product_ids, $unit_ids, $quantities, $price_units, $discount_fixes, $discount_percents);
 
             DB::commit();
+
             return redirect()->route('pembelian.index')->with('success', 'Pembelian berhasil diupdate');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->withErrors(['error' => 'Gagal mengupdate pembelian: ' . $e->getMessage()]);
+            report($e);
+
+            return redirect()->back()->withErrors(['error' => 'Gagal mengupdate pembelian.']);
         }
     }
 
@@ -522,7 +526,7 @@ class PurchaseController extends Controller
         try {
             $purchase = Purchase::with(['details.product', 'details.unit'])->find($id);
 
-            if (!$purchase) {
+            if (! $purchase) {
                 return redirect()->route('pembelian.index')->with('error', 'Data pembelian tidak ditemukan');
             }
 
@@ -535,12 +539,14 @@ class PurchaseController extends Controller
             $purchase->delete();
 
             DB::commit();
-            $message = "Pembelian berhasil dihapus";
+            $message = 'Pembelian berhasil dihapus';
 
             return redirect()->route('pembelian.index')->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->withErrors(['error' => 'Gagal menghapus pembelian: ' . $e->getMessage()]);
+            report($e);
+
+            return redirect()->back()->withErrors(['error' => 'Gagal menghapus pembelian.']);
         }
     }
 
@@ -649,8 +655,8 @@ class PurchaseController extends Controller
             'message' => 'Quantity updated successfully',
             'data' => [
                 'quantity' => $purchaseCart->quantity,
-                'subtotal' => $purchaseCart->total_price
-            ]
+                'subtotal' => $purchaseCart->total_price,
+            ],
         ]);
     }
 
@@ -658,6 +664,7 @@ class PurchaseController extends Controller
     {
         $warehouses = Warehouse::all();
         $users = User::all();
+
         return view('pages.purchase.debt', compact('warehouses', 'users'));
     }
 
@@ -729,7 +736,7 @@ class PurchaseController extends Controller
         try {
             // Fetch debt
             $debt = Purchase::with('supplier')->find($request->debt_id);
-            if (!$debt) {
+            if (! $debt) {
                 return redirect()->back()->withErrors('Debt not found.');
             }
 
@@ -751,10 +758,13 @@ class PurchaseController extends Controller
             $this->createCashflow($debt, $bayarHutang, $potongan, $request->payment_method);
 
             DB::commit();
+
             return redirect()->route('hutang')->withSuccess('Berhasil bayar hutang');
         } catch (\Throwable $th) {
             DB::rollBack();
-            return redirect()->back()->withErrors($th->getMessage());
+            report($th);
+
+            return redirect()->back()->withErrors('Terjadi kesalahan saat membayar hutang.');
         }
     }
 
@@ -813,6 +823,7 @@ class PurchaseController extends Controller
         } elseif ($unitId == $product->unit_pak) {
             return $quantity * $product->pak_to_eceran;
         }
+
         return $quantity; // Already in eceran
     }
 
@@ -823,6 +834,7 @@ class PurchaseController extends Controller
         } elseif ($unitId == $product->unit_pak) {
             return 'PAK';
         }
+
         return 'ECERAN';
     }
 
@@ -844,8 +856,8 @@ class PurchaseController extends Controller
         // Create reversal product report with appropriate type based on context
         $type = $isDeletion ? 'PEMBELIAN_HAPUS' : 'PEMBELIAN_EDIT_REVERSAL';
         $description = $isDeletion ?
-            'Hapus Pembelian ' . $detail->purchase->order_number :
-            'Reversal Pembelian Edit ' . $detail->purchase->order_number;
+            'Hapus Pembelian '.$detail->purchase->order_number :
+            'Reversal Pembelian Edit '.$detail->purchase->order_number;
 
         ProductReport::create([
             'product_id' => $detail->product_id,
@@ -857,7 +869,7 @@ class PurchaseController extends Controller
             'price' => $detail->price_unit,
             'for' => 'KELUAR',
             'type' => $type,
-            'description' => $description
+            'description' => $description,
         ]);
     }
 
@@ -889,7 +901,7 @@ class PurchaseController extends Controller
             'price' => $priceUnit,
             'for' => 'MASUK',
             'type' => 'PEMBELIAN_EDIT',
-            'description' => 'Update Pembelian ' . $orderNumber
+            'description' => 'Update Pembelian '.$orderNumber,
         ]);
     }
 
@@ -898,19 +910,20 @@ class PurchaseController extends Controller
         $subtotal = 0;
         foreach ($productIds as $key => $productId) {
             $formattedPriceUnit = $priceUnits[$key];
-            $numericPriceUnit = (int)str_replace(['Rp. ', '.', ','], '', $formattedPriceUnit);
+            $numericPriceUnit = (int) str_replace(['Rp. ', '.', ','], '', $formattedPriceUnit);
 
             if (isset($quantities[$key]) && isset($discountFixes[$key]) && isset($discountPercents[$key])) {
                 $subtotal += ($numericPriceUnit - $discountFixes[$key]) * (1 - $discountPercents[$key] / 100) * $quantities[$key];
             }
         }
+
         return $subtotal;
     }
 
     private function updatePurchaseDetails($purchase, $productIds, $unitIds, $quantities, $priceUnits, $discountFixes, $discountPercents)
     {
         foreach ($purchase->details as $key => $detail) {
-            $numericPriceUnit = (int)str_replace(['Rp. ', '.', ','], '', $priceUnits[$key]);
+            $numericPriceUnit = (int) str_replace(['Rp. ', '.', ','], '', $priceUnits[$key]);
 
             $detail->update([
                 'product_id' => $productIds[$key],
@@ -919,7 +932,7 @@ class PurchaseController extends Controller
                 'discount_fix' => $discountFixes[$key],
                 'discount_percent' => $discountPercents[$key],
                 'price_unit' => $numericPriceUnit,
-                'total_price' => ($numericPriceUnit - $discountFixes[$key]) * (1 - $discountPercents[$key] / 100) * $quantities[$key]
+                'total_price' => ($numericPriceUnit - $discountFixes[$key]) * (1 - $discountPercents[$key] / 100) * $quantities[$key],
             ]);
         }
     }

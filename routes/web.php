@@ -1,14 +1,20 @@
 <?php
 
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Api\CashAdvanceController as ApiCashAdvanceController;
+use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\BackupController;
+use App\Http\Controllers\BankController;
+use App\Http\Controllers\CashAdvanceController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\IncomeStatementController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\KasController;
-use App\Http\Controllers\KasIncomeItemController;
 use App\Http\Controllers\KasExpenseItemController;
+use App\Http\Controllers\KasIncomeItemController;
+use App\Http\Controllers\PaymentSettingController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductReportController;
@@ -19,7 +25,6 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SalaryController;
 use App\Http\Controllers\SalarySettingController;
-use App\Http\Controllers\PaymentSettingController;
 use App\Http\Controllers\SellController;
 use App\Http\Controllers\SellDraftController;
 use App\Http\Controllers\SellReturController;
@@ -30,22 +35,8 @@ use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\TreasuryMutationController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WarehouseController;
-use App\Http\Controllers\BackupController;
-use App\Http\Controllers\AttendanceController;
-use App\Http\Controllers\CashAdvanceController;
-use App\Http\Controllers\ActivityLogController;
-use App\Http\Controllers\BankController;
-use App\Http\Controllers\Auth\AuthenticatedSessionController;
-use App\Http\Controllers\Auth\ConfirmablePasswordController;
-use App\Http\Controllers\Auth\EmailVerificationNotificationController;
-use App\Http\Controllers\Auth\EmailVerificationPromptController;
-use App\Http\Controllers\Auth\NewPasswordController;
-use App\Http\Controllers\Auth\PasswordController;
-use App\Http\Controllers\Auth\PasswordResetLinkController;
-use App\Http\Controllers\Auth\RegisteredUserController;
-use App\Http\Controllers\Auth\VerifyEmailController;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -194,7 +185,6 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('laba-rugi/api/clear-cache', [IncomeStatementController::class, 'clearCache'])->name('api.income-statement.clear-cache');
     Route::get('karyawan/api/data', [EmployeeController::class, 'data'])->name('api.karyawan');
     Route::get('pindah-stok-draft/api/data', [SendStockDraftController::class, 'data'])->name('api.pindah-stok-draft');
-    Route::get('pembelian-retur/api/data', [PurchaseReturController::class, 'data'])->name('api.purchaseRetur');
     Route::get('kasbon/api/data', [CashAdvanceController::class, 'data'])->name('api.kasbon');
     Route::get('gaji/api/data', [SalaryController::class, 'data'])->name('api.gaji');
     Route::get('cash-advances/api/data', [ApiCashAdvanceController::class, 'getAvailableDeductions'])->name('api.cash-advances');
@@ -253,10 +243,13 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('validate-master-password', [SellController::class, 'validateMasterPassword'])->name('validate-master-password');
 
     // backup db
-    Route::get('/backup-database', [BackupController::class, 'backupDatabase'])->name('backup.database');
+    Route::post('/backup-database', [BackupController::class, 'backupDatabase'])
+        ->middleware('permission:backup database')
+        ->name('backup.database');
     // redis
     Route::get('/coba-redis', function () {
         Cache::put('tes_redis', 'berhasil', 10);
+
         return Cache::get('tes_redis');
     });
 
@@ -284,4 +277,4 @@ Route::group(['middleware' => ['auth']], function () {
         ->name('barcode.delete');
 });
 
-require __DIR__ . '/auth.php';
+require __DIR__.'/auth.php';

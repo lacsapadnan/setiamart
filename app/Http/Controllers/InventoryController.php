@@ -19,6 +19,7 @@ class InventoryController extends Controller
         $product = Product::orderBy('id', 'asc')->get();
         $warehouse = Warehouse::orderBy('id', 'asc')->get();
         $categories = Category::all();
+
         return view('pages.inventory.index', compact('product', 'warehouse', 'categories'));
     }
 
@@ -33,7 +34,7 @@ class InventoryController extends Controller
 
             if ($category) {
                 $query->whereHas('product', function ($q) use ($category) {
-                    $q->where('group', 'LIKE', '%' . $category . '%');
+                    $q->where('group', 'LIKE', '%'.$category.'%');
                 });
             }
 
@@ -45,16 +46,16 @@ class InventoryController extends Controller
 
             return datatables()->eloquent($query)->toJson();
         } catch (\Exception $e) {
-            \Log::error('InventoryController data method error: ' . $e->getMessage(), [
+            report($e);
+            \Log::error('InventoryController data method error: '.$e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'error' => true,
-                'message' => 'Terjadi kesalahan saat mengambil data inventory: ' . $e->getMessage(),
-                'details' => config('app.debug') ? $e->getTraceAsString() : null
+                'message' => 'Terjadi kesalahan saat mengambil data inventory.',
             ], 500);
         }
     }
@@ -70,7 +71,7 @@ class InventoryController extends Controller
 
             if ($category) {
                 $query->whereHas('product', function ($q) use ($category) {
-                    $q->where('group', 'LIKE', '%' . $category . '%');
+                    $q->where('group', 'LIKE', '%'.$category.'%');
                 });
             }
 
@@ -89,24 +90,24 @@ class InventoryController extends Controller
                     'product_name' => $inventory->product->name ?? '',
                     'dus_to_eceran' => $inventory->product->dus_to_eceran ?? '',
                     'pak_to_eceran' => $inventory->product->pak_to_eceran ?? '',
-                    'quantity' => $inventory->quantity ?? 0
+                    'quantity' => $inventory->quantity ?? 0,
                 ];
             });
 
             return response()->json([
-                'data' => $data
+                'data' => $data,
             ]);
         } catch (\Exception $e) {
-            \Log::error('InventoryController exportData method error: ' . $e->getMessage(), [
+            report($e);
+            \Log::error('InventoryController exportData method error: '.$e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'error' => true,
-                'message' => 'Terjadi kesalahan saat mengekspor data inventory: ' . $e->getMessage(),
-                'details' => config('app.debug') ? $e->getTraceAsString() : null
+                'message' => 'Terjadi kesalahan saat mengekspor data inventory.',
             ], 500);
         }
     }
@@ -125,10 +126,10 @@ class InventoryController extends Controller
             $query->whereHas('product', function ($query) use ($searchQuery) {
                 $query->where('isShow', true)
                     ->where(function ($subQuery) use ($searchQuery) {
-                        $subQuery->where('name', 'LIKE', '%' . $searchQuery . '%')
-                            ->orWhere('barcode_dus', 'LIKE', '%' . $searchQuery . '%')
-                            ->orWhere('barcode_pak', 'LIKE', '%' . $searchQuery . '%')
-                            ->orWhere('barcode_eceran', 'LIKE', '%' . $searchQuery . '%');
+                        $subQuery->where('name', 'LIKE', '%'.$searchQuery.'%')
+                            ->orWhere('barcode_dus', 'LIKE', '%'.$searchQuery.'%')
+                            ->orWhere('barcode_pak', 'LIKE', '%'.$searchQuery.'%')
+                            ->orWhere('barcode_eceran', 'LIKE', '%'.$searchQuery.'%');
                     });
             });
         } else {
@@ -167,6 +168,7 @@ class InventoryController extends Controller
     public function store(InventoryRequest $request)
     {
         Inventory::create($request->validated());
+
         return redirect()->route('inventori.index')->with('success', 'Inventory berhasil ditambahkan');
     }
 
@@ -184,6 +186,7 @@ class InventoryController extends Controller
     public function edit(string $id)
     {
         $inventory = Inventory::findOrFail($id);
+
         return response()->json($inventory);
     }
 
@@ -194,6 +197,7 @@ class InventoryController extends Controller
     {
         $inventory = Inventory::findOrFail($id);
         $inventory->update($request->all());
+
         return redirect()->route('inventori.index')->with('success', 'Inventory berhasil diubah');
     }
 
@@ -204,6 +208,7 @@ class InventoryController extends Controller
     {
         $inventory = Inventory::findOrFail($id);
         $inventory->delete();
+
         return redirect()->route('inventori.index')->with('success', 'Inventory berhasil dihapus');
     }
 }

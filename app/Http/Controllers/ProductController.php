@@ -12,9 +12,12 @@ use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\Unit;
 use App\Models\Warehouse;
+use Illuminate\Bus\Batch;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ProductController extends Controller
@@ -121,10 +124,11 @@ class ProductController extends Controller
                 ->with('success', 'Produk berhasil ditambahkan');
         } catch (\Exception $e) {
             DB::rollBack();
+            report($e);
 
             return redirect()
                 ->back()
-                ->with('error', 'Gagal menambahkan produk: '.$e->getMessage());
+                ->with('error', 'Gagal menambahkan produk. Silakan coba lagi.');
         }
     }
 
@@ -169,8 +173,9 @@ class ProductController extends Controller
             return redirect()->route('produk.index')->with('success', 'Produk berhasil diubah');
         } catch (\Exception $e) {
             DB::rollBack();
+            report($e);
 
-            return redirect()->back()->with('error', 'Gagal mengubah produk: '.$e->getMessage());
+            return redirect()->back()->with('error', 'Gagal mengubah produk. Silakan coba lagi.');
         }
     }
 
@@ -234,7 +239,7 @@ class ProductController extends Controller
                 ])
                 ->toArray();
 
-            $validProductIds = \App\Models\Product::whereIn('id', array_column($requestedProducts, 'id'))
+            $validProductIds = Product::whereIn('id', array_column($requestedProducts, 'id'))
                 ->pluck('id')
                 ->toArray();
 
@@ -246,7 +251,7 @@ class ProductController extends Controller
                 throw new \Exception('Tidak ada produk valid yang ditemukan.');
             }
 
-            $batchId = (string) \Illuminate\Support\Str::uuid();
+            $batchId = (string) Str::uuid();
             $filename = 'barcode_labels_'.date('Y-m-d_His').'_'.$batchId.'.pdf';
             $userId = auth()->id();
 
@@ -259,13 +264,12 @@ class ProductController extends Controller
             }
 
             // Use job batching with merge callback
-            $batch = \Illuminate\Support\Facades\Bus::batch($jobs)
-                ->then(function (\Illuminate\Bus\Batch $batch) use ($filename, $chunks, $userId, $validProducts) {
+            $batch = Bus::batch($jobs)
+                ->then(function (Batch $batch) use ($filename, $chunks, $userId, $validProducts) {
                     // Merge all PDF parts after all jobs complete
                     dispatch(new MergeBarcodePDFs($filename, count($chunks), $userId, count($validProducts), $batch->id));
                 })
-                ->catch(function (\Illuminate\Bus\Batch $batch, \Throwable $e) use ($filename) {
-                })
+                ->catch(function (Batch $batch, \Throwable $e) {})
                 ->name('barcode-generation-'.$batchId)
                 ->dispatch();
 
@@ -283,14 +287,15 @@ class ProductController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            report($e);
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Terjadi kesalahan: '.$e->getMessage(),
+                    'message' => 'Terjadi kesalahan saat memproses barcode.',
                 ], 500);
             }
 
-            return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat memproses barcode.');
         }
     }
 

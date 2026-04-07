@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\SalesExport;
 use App\Models\Customer;
 use App\Models\Inventory;
 use App\Models\PaymentSetting;
@@ -16,19 +17,17 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\CashflowService;
-use App\Exports\SalesExport;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
+use DataTables;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Response;
+use Maatwebsite\Excel\Facades\Excel;
 use Mike42\Escpos\EscposImage;
-use Mike42\Escpos\ImagickEscposImage;
 use Mike42\Escpos\PrintConnectors\FilePrintConnector;
 use Mike42\Escpos\Printer;
-use DataTables;
-use Illuminate\Support\Facades\Log;
-use Maatwebsite\Excel\Facades\Excel;
 
 class SellController extends Controller
 {
@@ -47,6 +46,7 @@ class SellController extends Controller
         $masters = User::role('master')->get();
         $warehouses = Warehouse::all();
         $users = User::all();
+
         return view('pages.sell.index', compact('masters', 'warehouses', 'users'));
     }
 
@@ -71,7 +71,7 @@ class SellController extends Controller
                 'details' => function ($query) {
                     $query->whereNotNull('unit_id');
                 },
-                'details.unit'
+                'details.unit',
             ])
                 ->where('status', '!=', 'draft')
                 ->orderBy('id', 'desc');
@@ -90,11 +90,11 @@ class SellController extends Controller
             }
 
             if ($fromDate && $toDate) {
-                $endDate = \Carbon\Carbon::parse($toDate)->endOfDay();
+                $endDate = Carbon::parse($toDate)->endOfDay();
                 $query->whereBetween('created_at', [$fromDate, $endDate]);
             }
 
-            if (!empty($search) && !empty($search['value'])) {
+            if (! empty($search) && ! empty($search['value'])) {
                 $searchValue = $search['value'];
                 $query->where(function ($q) use ($searchValue) {
                     $q->where('order_number', 'like', "%{$searchValue}%")
@@ -115,17 +115,17 @@ class SellController extends Controller
             return DataTables::of($query)
                 ->make(true);
         } catch (\Throwable $e) {
-            Log::error('SellController data method error: ' . $e->getMessage(), [
+            report($e);
+            Log::error('SellController data method error: '.$e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => $request->all()
+                'request_data' => $request->all(),
             ]);
 
             return response()->json([
                 'error' => true,
-                'message' => 'Terjadi kesalahan saat mengambil data: ' . $e->getMessage(),
-                'details' => config('app.debug') ? $e->getTraceAsString() : null
+                'message' => 'Terjadi kesalahan saat mengambil data penjualan.',
             ], 500);
         }
     }
@@ -171,7 +171,7 @@ class SellController extends Controller
         $formattedOrderNumber = str_pad($newOrderNumber, 4, '0', STR_PAD_LEFT);
 
         // Generate the order number string with warehouseId in the middle
-        $orderNumber = "PJ-" . $today . "-" . $warehouseId . auth()->id() . "-" . $formattedOrderNumber;
+        $orderNumber = 'PJ-'.$today.'-'.$warehouseId.auth()->id().'-'.$formattedOrderNumber;
         $cart = SellCart::with('product', 'unit')->orderBy('id', 'desc')
             ->where('cashier_id', auth()->id())
             ->get();
@@ -180,6 +180,7 @@ class SellController extends Controller
             $subtotal += ($c->price * $c->quantity) - $c->diskon;
         }
         $masters = User::role('master')->get();
+
         return view('pages.sell.create', compact('inventories', 'products', 'cart', 'subtotal', 'customers', 'orderNumber', 'masters'));
     }
 
@@ -195,9 +196,9 @@ class SellController extends Controller
             return redirect()->back()->withInput()->withErrors('Keranjang penjualan kosong');
         }
 
-        $transfer = (int)str_replace(',', '', $request->transfer ?? 0);
-        $cash = (int)str_replace(',', '', $request->cash ?? 0);
-        $grandtotal = (int)preg_replace('/[,.]/', '', $request->grand_total);
+        $transfer = (int) str_replace(',', '', $request->transfer ?? 0);
+        $cash = (int) str_replace(',', '', $request->cash ?? 0);
+        $grandtotal = (int) preg_replace('/[,.]/', '', $request->grand_total);
         $pay = $transfer + $cash;
 
         if ($request->status === 'draft') {
@@ -210,7 +211,7 @@ class SellController extends Controller
 
         $grandTotalValid = 0;
         foreach ($sellCart as $sc) {
-            $grandTotalValid += (int)preg_replace('/[,.]/', '', ($sc->price * $sc->quantity) - $sc->diskon);
+            $grandTotalValid += (int) preg_replace('/[,.]/', '', ($sc->price * $sc->quantity) - $sc->diskon);
         }
 
         if ($grandtotal !== $grandTotalValid) {
@@ -312,7 +313,7 @@ class SellController extends Controller
                         'price' => ($sc->price * $sc->quantity) - $sc->diskon,
                         'for' => 'KELUAR',
                         'type' => 'PENJUALAN',
-                        'description' => 'Penjualan ' . $sell->order_number,
+                        'description' => 'Penjualan '.$sell->order_number,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
@@ -366,7 +367,8 @@ class SellController extends Controller
                             window.open('$printUrl', '_blank');
                         }, 500);
                     </script>";
-                    return Response::make($script . '<script>setTimeout(function() { window.location.href = "' . route('penjualan.index') . '"; }, 1000);</script>');
+
+                    return Response::make($script.'<script>setTimeout(function() { window.location.href = "'.route('penjualan.index').'"; }, 1000);</script>');
                 } catch (\Throwable $th) {
                     return redirect()->route('penjualan.index')->withErrors('Transaksi berhasil disimpan, tetapi gagal mencetak struk');
                 }
@@ -375,8 +377,10 @@ class SellController extends Controller
             }
         } catch (\Exception $e) {
             DB::rollBack();
+            report($e);
+
             return redirect()->back()->withInput()
-                ->withErrors('Terjadi kesalahan saat menyimpan transaksi: ' . $e->getMessage());
+                ->withErrors('Terjadi kesalahan saat menyimpan transaksi.');
         }
     }
 
@@ -394,7 +398,7 @@ class SellController extends Controller
         $returnedItems = collect();
         foreach ($sellReturs as $sellRetur) {
             foreach ($sellRetur->sellReturDetails as $returDetail) {
-                $key = $returDetail->product_id . '_' . $returDetail->unit_id;
+                $key = $returDetail->product_id.'_'.$returDetail->unit_id;
                 if ($returnedItems->has($key)) {
                     $returnedItems[$key]['qty'] += $returDetail->qty;
                 } else {
@@ -404,7 +408,7 @@ class SellController extends Controller
                         'product_name' => $returDetail->product->name,
                         'unit_name' => $returDetail->unit->name,
                         'qty' => $returDetail->qty,
-                        'price' => $returDetail->price
+                        'price' => $returDetail->price,
                     ];
                 }
             }
@@ -419,19 +423,19 @@ class SellController extends Controller
         $pdf = Pdf::loadView('pages.sell.print', compact('sell', 'details', 'totalQuantity', 'returnedItems', 'paymentSetting'));
 
         // Save the PDF to a file
-        $pdf->save("receipt.pdf");
+        $pdf->save('receipt.pdf');
 
         // Convert the PDF to an image using Imagick
-        $imagick = new \Imagick();
-        $imagick->readImage("receipt.pdf[0]"); // Read the first page of the PDF
+        $imagick = new \Imagick;
+        $imagick->readImage('receipt.pdf[0]'); // Read the first page of the PDF
         $imagick->setImageFormat('png');
         $imagick->writeImage('receipt.png');
 
-        $connector = new FilePrintConnector("php://stdout");
+        $connector = new FilePrintConnector('php://stdout');
         $printer = new Printer($connector);
 
         // Load the image
-        $img = EscposImage::load("receipt.png", false);
+        $img = EscposImage::load('receipt.png', false);
 
         // Print the image
         $printer->graphics($img);
@@ -483,7 +487,7 @@ class SellController extends Controller
             'details.product.unit_dus',
             'details.product.unit_pak',
             'details.product.unit_eceran',
-            'details.unit'
+            'details.unit',
         ]);
 
         // Apply warehouse filter for non-master users
@@ -493,7 +497,7 @@ class SellController extends Controller
 
         $sell = $query->find($id);
 
-        if (!$sell) {
+        if (! $sell) {
             return response()->json(['error' => 'Data penjualan tidak ditemukan atau Anda tidak memiliki akses'], 404);
         }
 
@@ -529,26 +533,27 @@ class SellController extends Controller
     {
         $sell = Sell::find($id);
 
-        if (!$sell) {
+        if (! $sell) {
             if (request()->ajax()) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Data penjualan tidak ditemukan'
+                    'message' => 'Data penjualan tidak ditemukan',
                 ], 404);
             }
+
             return redirect()->back()->with('error', 'Data penjualan tidak ditemukan');
         }
 
         // Delete the sell record
         $sell->delete();
 
-        $message = "Data penjualan berhasil dihapus";
+        $message = 'Data penjualan berhasil dihapus';
 
         // For AJAX requests, return JSON to avoid redirect method-mismatch issues
         if (request()->ajax()) {
             return response()->json([
                 'status' => 'success',
-                'message' => $message
+                'message' => $message,
             ]);
         }
 
@@ -559,7 +564,6 @@ class SellController extends Controller
     {
         // $inputRequests = $request->input('requests');
         $requests = $request->input('requests');
-
 
         try {
             DB::beginTransaction();
@@ -589,6 +593,7 @@ class SellController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json(['error' => 'Failed to add items to cart.'], 500);
         }
 
@@ -641,7 +646,7 @@ class SellController extends Controller
             ->first();
 
         // Check if product and inventory exist
-        if (!$product || !$inventory) {
+        if (! $product || ! $inventory) {
             return;
         }
 
@@ -663,13 +668,14 @@ class SellController extends Controller
             ->first();
 
         // Check if cart item exists
-        if (!$sellCart) {
+        if (! $sellCart) {
             if ($request->ajax()) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Item keranjang tidak ditemukan'
+                    'message' => 'Item keranjang tidak ditemukan',
                 ], 404);
             }
+
             return redirect()->back()->with('error', 'Item keranjang tidak ditemukan');
         }
 
@@ -702,7 +708,7 @@ class SellController extends Controller
         if ($request->ajax()) {
             return response()->json([
                 'status' => 'success',
-                'message' => 'Item berhasil dihapus dari keranjang'
+                'message' => 'Item berhasil dihapus dari keranjang',
             ]);
         }
 
@@ -754,8 +760,8 @@ class SellController extends Controller
             'message' => 'Quantity updated successfully',
             'data' => [
                 'quantity' => $sellCart->quantity,
-                'subtotal' => $sellCart->price * $sellCart->quantity - $sellCart->diskon
-            ]
+                'subtotal' => $sellCart->price * $sellCart->quantity - $sellCart->diskon,
+            ],
         ]);
     }
 
@@ -773,7 +779,7 @@ class SellController extends Controller
         $returnedItems = collect();
         foreach ($sellReturs as $sellRetur) {
             foreach ($sellRetur->sellReturDetails as $returDetail) {
-                $key = $returDetail->product_id . '_' . $returDetail->unit_id;
+                $key = $returDetail->product_id.'_'.$returDetail->unit_id;
                 if ($returnedItems->has($key)) {
                     $returnedItems[$key]['qty'] += $returDetail->qty;
                 } else {
@@ -783,7 +789,7 @@ class SellController extends Controller
                         'product_name' => $returDetail->product->name,
                         'unit_name' => $returDetail->unit->name,
                         'qty' => $returDetail->qty,
-                        'price' => $returDetail->price
+                        'price' => $returDetail->price,
                     ];
                 }
             }
@@ -796,12 +802,13 @@ class SellController extends Controller
         $paymentSetting = PaymentSetting::first();
 
         $pdf = Pdf::loadView('pages.sell.print', compact('sell', 'details', 'totalQuantity', 'returnedItems', 'paymentSetting'));
+
         return response()->stream(function () use ($pdf) {
             echo $pdf->output();
         }, 200, [
             'attachment' => false,
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="Transaksi-' . $sell->order_number . '.pdf"'
+            'Content-Disposition' => 'inline; filename="Transaksi-'.$sell->order_number.'.pdf"',
         ]);
     }
 
@@ -809,6 +816,7 @@ class SellController extends Controller
     {
         $warehouses = Warehouse::with('users')->get();
         $users = User::with('roles', 'warehouse')->get();
+
         return view('pages.sell.credit', compact('warehouses', 'users'));
     }
 
@@ -827,7 +835,7 @@ class SellController extends Controller
             'details.product.unit_dus',
             'details.product.unit_pak',
             'details.product.unit_eceran',
-            'details.unit'
+            'details.unit',
         ])->where('status', 'piutang');
 
         if ($userRoles[0] != 'master') {
@@ -860,10 +868,10 @@ class SellController extends Controller
 
         $sell = Sell::with('customer')->find($validated['sell_id']);
 
-        if (!$sell) {
+        if (! $sell) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Sale not found'
+                'message' => 'Sale not found',
             ]);
         }
 
@@ -886,7 +894,7 @@ class SellController extends Controller
             if ($paymentCash < 0 || $paymentTransfer < 0) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Pembayaran tidak boleh kurang dari 0'
+                    'message' => 'Pembayaran tidak boleh kurang dari 0',
                 ]);
             }
         } else {
@@ -894,7 +902,7 @@ class SellController extends Controller
             if ($payment <= 0) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Pembayaran tidak boleh 0 atau kurang'
+                    'message' => 'Pembayaran tidak boleh 0 atau kurang',
                 ]);
             }
         }
@@ -905,7 +913,7 @@ class SellController extends Controller
         if ($payment > $sisaHutang) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Total pembayaran tidak boleh lebih dari sisa piutang'
+                'message' => 'Total pembayaran tidak boleh lebih dari sisa piutang',
             ]);
         }
 
@@ -932,7 +940,7 @@ class SellController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Pembayaran piutang berhasil'
+            'message' => 'Pembayaran piutang berhasil',
         ]);
     }
 
@@ -963,7 +971,7 @@ class SellController extends Controller
         ];
 
         // Apply restrictions for non-master users
-        if (!$isMaster) {
+        if (! $isMaster) {
             $filters['restrict_warehouse_id'] = auth()->user()->warehouse_id;
             $filters['restrict_cashier_id'] = auth()->id();
         }
@@ -981,19 +989,20 @@ class SellController extends Controller
             $filename = "sales_{$date}.xlsx";
 
             if ($count > 20000) {
-                return response('<h1>Dataset Too Large</h1><p>This export contains ' . number_format($count) . ' records. Please use date filters to reduce the dataset size to under 20,000 records.</p>', 413);
+                return response('<h1>Dataset Too Large</h1><p>This export contains '.number_format($count).' records. Please use date filters to reduce the dataset size to under 20,000 records.</p>', 413);
             }
 
             return Excel::download(new SalesExport($filters), $filename);
         } catch (\Exception $e) {
+            report($e);
             Log::error('Sales export failed', [
                 'error' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
-            return response('<h1>Export Failed</h1><p>Error: ' . $e->getMessage() . '</p><p>Please check the logs for more details.</p>', 500);
+            return response('<h1>Export Failed</h1><p>Terjadi kesalahan saat export penjualan. Silakan coba lagi.</p>', 500);
         }
     }
 }

@@ -1,32 +1,45 @@
 <?php
+
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
-use Carbon\Carbon;
-use Symfony\Component\Process\Process;
-use Symfony\Component\Process\Exception\ProcessFailedException;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Throwable;
 
 class BackupController extends Controller
 {
-    public function backupDatabase()
+    public function backupDatabase(): BinaryFileResponse|RedirectResponse
     {
-        $dbName = env('DB_DATABASE');
-        $dbUser = env('DB_USERNAME');
-        $dbPass = env('DB_PASSWORD');
-        $dbHost = env('DB_HOST');
-        $timestamp = Carbon::now()->format('Y-m-d_H-i-s');
-        $filePath = storage_path("app/backups/backup_{$timestamp}.sql");
-        Storage::makeDirectory('backups');
-        $mysqldumpPath = env('MYSQLDUMP_PATH', 'mysqldump'); 
-        $command = "{$mysqldumpPath} --user={$dbUser} --password={$dbPass} --host={$dbHost} {$dbName} > {$filePath}";
+        try {
+            $fileName = 'backup_'.now()->format('Y-m-d_H-i-s').'.sql';
+            $exitCode = Artisan::call('db:backup', [
+                '--filename' => $fileName,
+            ]);
 
-        $process = Process::fromShellCommandline($command);
-        $process->run();
-        if (!$process->isSuccessful()) {
-            throw new ProcessFailedException($process);
+            if ($exitCode !== 0) {
+                throw new \RuntimeException('Backup command returned non-zero exit code.');
+            }
+
+            $relativePath = trim(Artisan::output());
+            $absolutePath = storage_path('app/'.$relativePath);
+
+            Log::info('Database backup generated', [
+                'user_id' => auth()->id(),
+                'path' => $relativePath,
+            ]);
+
+            return response()->download($absolutePath)->deleteFileAfterSend(true);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            Log::warning('Database backup failed', [
+                'user_id' => auth()->id(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            return redirect()->back()->with('error', 'Backup database gagal diproses. Silakan coba lagi.');
         }
-
-        return response()->download($filePath)->deleteFileAfterSend(true);
     }
 }
