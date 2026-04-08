@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 
 class ReportRequest extends FormRequest
 {
@@ -60,13 +62,15 @@ class ReportRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        // Set default dates if not provided
-        if (!$this->filled('from_date')) {
-            $this->merge(['from_date' => now()->format('Y-m-d')]);
-        }
+        // Default to the latest available cashflow date so first page load shows actual data.
+        if (! $this->filled('from_date') || ! $this->filled('to_date')) {
+            $latestCashflowDate = DB::table('cashflows')->max(DB::raw('DATE(created_at)'));
+            $defaultDate = $latestCashflowDate ?: now()->format('Y-m-d');
 
-        if (!$this->filled('to_date')) {
-            $this->merge(['to_date' => now()->format('Y-m-d')]);
+            $this->merge([
+                'from_date' => $this->input('from_date', $defaultDate),
+                'to_date' => $this->input('to_date', $defaultDate),
+            ]);
         }
     }
 
@@ -78,8 +82,8 @@ class ReportRequest extends FormRequest
         $validator->after(function ($validator) {
             // Additional validation logic can be added here
             if ($this->filled('from_date') && $this->filled('to_date')) {
-                $fromDate = \Carbon\Carbon::parse($this->from_date);
-                $toDate = \Carbon\Carbon::parse($this->to_date);
+                $fromDate = Carbon::parse($this->from_date);
+                $toDate = Carbon::parse($this->to_date);
 
                 // Check if date range is not too large (e.g., more than 1 year)
                 if ($fromDate->diffInDays($toDate) > 365) {

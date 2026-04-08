@@ -382,7 +382,8 @@
             // Create a form dynamically to handle the DELETE request properly
             var form = document.createElement('form');
             form.method = 'POST';
-            form.action = "{{ route('laporan.destroy', '') }}/" + id;
+            var destroyUrlTemplate = "{{ route('laporan.destroy', ['id' => '__ID__']) }}";
+            form.action = destroyUrlTemplate.replace('__ID__', encodeURIComponent(id));
             form.style.display = 'none';
 
             // Add CSRF token
