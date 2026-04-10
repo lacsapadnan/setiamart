@@ -579,6 +579,10 @@ class PurchaseController extends Controller
 
     private function processCartItem($userId, $productId, $quantity, $unitId, $price, $discountFix, $discountPercent)
     {
+        $quantity = round((float) $quantity, 2);
+        $price = (float) str_replace(',', '', $price);
+        $discountFix = (float) str_replace(',', '', $discountFix);
+        $discountPercent = (float) str_replace(',', '', $discountPercent);
         $totalPrice = 0;
 
         // calculated total price if discount_fix or discount_percent exists or both exists
@@ -598,7 +602,7 @@ class PurchaseController extends Controller
             ->first();
 
         if ($existingCart) {
-            $existingCart->quantity += $quantity;
+            $existingCart->quantity = round((float) $existingCart->quantity + $quantity, 2);
             $existingCart->update();
         } else {
             PurchaseCart::create([
@@ -625,11 +629,11 @@ class PurchaseController extends Controller
     public function updateCartQuantity(Request $request, $id)
     {
         $request->validate([
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'required|numeric|decimal:0,2|min:0.01',
         ]);
 
         $purchaseCart = PurchaseCart::findOrFail($id);
-        $newQuantity = $request->quantity;
+        $newQuantity = round((float) $request->quantity, 2);
 
         // Recalculate total price based on new quantity
         $totalPrice = 0;
@@ -654,8 +658,8 @@ class PurchaseController extends Controller
             'success' => true,
             'message' => 'Quantity updated successfully',
             'data' => [
-                'quantity' => $purchaseCart->quantity,
-                'subtotal' => $purchaseCart->total_price,
+                'quantity' => round((float) $purchaseCart->quantity, 2),
+                'subtotal' => round((float) $purchaseCart->total_price, 2),
             ],
         ]);
     }

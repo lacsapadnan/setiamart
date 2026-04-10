@@ -602,8 +602,8 @@ class SellController extends Controller
 
     private function processCartItem($productId, $quantity, $unitId, $price, $discount)
     {
-        // Cast to numeric types to prevent string multiplication errors
-        $quantity = (int) $quantity;
+        // Cast to numeric types to support decimal quantity input
+        $quantity = round((float) $quantity, 2);
         $price = (float) str_replace(',', '', $price); // Remove commas if present
         $discount = (float) str_replace(',', '', $discount);
 
@@ -621,7 +621,7 @@ class SellController extends Controller
             ->first();
 
         if ($existingCart) {
-            $existingCart->quantity += $quantity;
+            $existingCart->quantity = round((float) $existingCart->quantity + $quantity, 2);
             $existingCart->save();
         } else {
             SellCart::create([
@@ -637,8 +637,8 @@ class SellController extends Controller
 
     private function decreaseInventory($productId, $quantity, $unitId)
     {
-        // Cast to int to prevent type errors
-        $quantity = (int) $quantity;
+        // Cast to float to support decimal quantity input
+        $quantity = round((float) $quantity, 2);
 
         $product = Product::find($productId);
         $inventory = Inventory::where('product_id', $productId)
@@ -718,7 +718,7 @@ class SellController extends Controller
     public function updateCartQuantity(Request $request, $id)
     {
         $request->validate([
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'required|numeric|decimal:0,2|min:0.01',
         ]);
 
         $sellCart = SellCart::findOrFail($id);
@@ -729,7 +729,7 @@ class SellController extends Controller
 
         // Calculate inventory adjustment
         $oldQuantity = $sellCart->quantity;
-        $newQuantity = $request->quantity;
+        $newQuantity = round((float) $request->quantity, 2);
 
         // Restore old quantity to inventory
         if ($sellCart->unit_id == $product->unit_dus) {
@@ -759,8 +759,8 @@ class SellController extends Controller
             'success' => true,
             'message' => 'Quantity updated successfully',
             'data' => [
-                'quantity' => $sellCart->quantity,
-                'subtotal' => $sellCart->price * $sellCart->quantity - $sellCart->diskon,
+                'quantity' => round((float) $sellCart->quantity, 2),
+                'subtotal' => round($sellCart->price * $sellCart->quantity - $sellCart->diskon, 2),
             ],
         ]);
     }
