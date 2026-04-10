@@ -41,6 +41,7 @@ class SellDraftController extends Controller
             ->where('warehouse_id', auth()->user()->warehouse_id)
             ->orderBy('id', 'desc')
             ->get();
+
         return response()->json($sells);
     }
 
@@ -83,6 +84,7 @@ class SellDraftController extends Controller
             $subtotal += $c->price * $c->quantity - $c->diskon;
         }
         $masters = User::role('master')->get();
+
         return view('pages.sell.show-draft', compact('sell', 'inventories', 'products', 'cart', 'subtotal', 'customers', 'orderNumber', 'masters'));
     }
 
@@ -139,7 +141,7 @@ class SellDraftController extends Controller
             }
 
             $formattedOrderNumber = str_pad($newOrderNumber, 4, '0', STR_PAD_LEFT);
-            $sell->order_number = "PJ-" . $today . "-" . $warehouseId . $userId . "-" . $formattedOrderNumber;
+            $sell->order_number = 'PJ-'.$today.'-'.$warehouseId.$userId.'-'.$formattedOrderNumber;
         }
 
         $sell->status = $status;
@@ -171,7 +173,7 @@ class SellDraftController extends Controller
                         'quantity' => $sc->quantity,
                         'price' => $sc->price,
                         'diskon' => $sc->diskon,
-                        'sell_id' => $id
+                        'sell_id' => $id,
                     ]);
                 }
             }
@@ -212,7 +214,7 @@ class SellDraftController extends Controller
                     'price' => $sc->price,
                     'for' => 'KELUAR',
                     'type' => 'PENJUALAN',
-                    'description' => 'Penjualan ' . $sell->order_number,
+                    'description' => 'Penjualan '.$sell->order_number,
                 ]);
             }
 
@@ -249,7 +251,8 @@ class SellDraftController extends Controller
                         window.open('$printUrl', '_blank');
                     }, 500);
                 </script>";
-                return Response::make($script . '<script>setTimeout(function() { window.location.href = "' . route('penjualan.index') . '"; }, 1000);</script>');
+
+                return Response::make($script.'<script>setTimeout(function() { window.location.href = "'.route('penjualan.index').'"; }, 1000);</script>');
             } catch (\Throwable $th) {
                 return redirect()->route('penjualan.index')->withErrors('Transaksi berhasil disimpan, tetapi gagal mencetak struk');
             }
@@ -265,7 +268,7 @@ class SellDraftController extends Controller
     {
         $sell = Sell::where('id', $id)->first();
 
-        if (!$sell) {
+        if (! $sell) {
             return redirect()
                 ->route('penjualan-draft.index')
                 ->with('error', 'Data penjualan draft tidak ditemukan');
@@ -299,7 +302,7 @@ class SellDraftController extends Controller
         $sellCart->each->delete();
         $sell->delete();
 
-        $message = "Penjualan draft berhasil dihapus";
+        $message = 'Penjualan draft berhasil dihapus';
         if ($deletedCashflows > 0) {
             $message .= " beserta {$deletedCashflows} record cashflow terkait";
         }
@@ -317,7 +320,7 @@ class SellDraftController extends Controller
             return response()->json(['error' => 'Invalid input data.'], 400);
         }
 
-        if (!is_array($inputRequests)) {
+        if (! is_array($inputRequests)) {
             return response()->json(['error' => 'Invalid input data.'], 400);
         }
 
@@ -325,43 +328,68 @@ class SellDraftController extends Controller
             DB::beginTransaction();
 
             foreach ($inputRequests as $inputRequest) {
-                if (!is_array($inputRequest)) {
+                if (! is_array($inputRequest)) {
                     continue;
                 }
 
                 $productId = $inputRequest['product_id'];
                 $sellId = $inputRequest['sell_id'];
+                $product = Product::find($productId);
+
+                if (! $product) {
+                    DB::rollBack();
+
+                    return response()->json(['errors' => ['Produk tidak ditemukan.']], 422);
+                }
 
                 $quantityDus = isset($inputRequest['quantity_dus']) ? intval($inputRequest['quantity_dus']) : 0;
                 $quantityPak = isset($inputRequest['quantity_pak']) ? intval($inputRequest['quantity_pak']) : 0;
                 $quantityEceran = isset($inputRequest['quantity_eceran']) ? intval($inputRequest['quantity_eceran']) : 0;
 
-                if (!isset($inputRequest['unit_dus'])) {
+                if (! isset($inputRequest['unit_dus'])) {
                     continue;
                 }
 
-                if (!isset($inputRequest['unit_pak'])) {
+                if (! isset($inputRequest['unit_pak'])) {
                     continue;
                 }
 
-                if (!isset($inputRequest['unit_eceran'])) {
+                if (! isset($inputRequest['unit_eceran'])) {
                     continue;
                 }
 
                 // Process quantity_dus if it exists
                 if ($quantityDus) {
+                    $validationError = $this->validateSellPriceInput($inputRequest['price_dus'] ?? null, $product->name, 'dus');
+                    if ($validationError !== null) {
+                        DB::rollBack();
+
+                        return response()->json(['errors' => [$validationError]], 422);
+                    }
                     $this->processCartItem($productId, $sellId, $quantityDus, $inputRequest['unit_dus'], $inputRequest['price_dus'], $inputRequest['diskon_dus'] ?? 0);
                     $this->decreaseInventory($productId, $quantityDus, $inputRequest['unit_dus']);
                 }
 
                 // Process quantity_pak if it exists
                 if ($quantityPak) {
+                    $validationError = $this->validateSellPriceInput($inputRequest['price_pak'] ?? null, $product->name, 'pak');
+                    if ($validationError !== null) {
+                        DB::rollBack();
+
+                        return response()->json(['errors' => [$validationError]], 422);
+                    }
                     $this->processCartItem($productId, $sellId, $quantityPak, $inputRequest['unit_pak'], $inputRequest['price_pak'], $inputRequest['diskon_pak'] ?? 0);
                     $this->decreaseInventory($productId, $quantityPak, $inputRequest['unit_pak']);
                 }
 
                 // Process quantity_eceran if it exists
                 if ($quantityEceran) {
+                    $validationError = $this->validateSellPriceInput($inputRequest['price_eceran'] ?? null, $product->name, 'eceran');
+                    if ($validationError !== null) {
+                        DB::rollBack();
+
+                        return response()->json(['errors' => [$validationError]], 422);
+                    }
                     $this->processCartItem($productId, $sellId, $quantityEceran, $inputRequest['unit_eceran'], $inputRequest['price_eceran'], $inputRequest['diskon_eceran'] ?? 0);
                     $this->decreaseInventory($productId, $quantityEceran, $inputRequest['unit_eceran']);
                 }
@@ -370,10 +398,35 @@ class SellDraftController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
+
             return response()->json(['error' => 'Failed to add items to cart.'], 500);
         }
 
         return response()->json(['success' => 'Items added to cart successfully.'], 200);
+    }
+
+    private function validateSellPriceInput($priceInput, string $productName, string $unitName): ?string
+    {
+        $normalizedPrice = $this->normalizeSellPriceInput($priceInput);
+        if ($normalizedPrice === null || $normalizedPrice <= 0) {
+            return "Harga jual produk {$productName} ({$unitName}) harus lebih dari 0.";
+        }
+
+        return null;
+    }
+
+    private function normalizeSellPriceInput($priceInput): ?float
+    {
+        if ($priceInput === null || $priceInput === '') {
+            return null;
+        }
+
+        $normalizedPrice = str_replace(',', '', (string) $priceInput);
+        if (! is_numeric($normalizedPrice)) {
+            return null;
+        }
+
+        return (float) $normalizedPrice;
     }
 
     private function processCartItem($productId, $sellId, $quantity, $unitId, $price, $discount)
@@ -491,7 +544,7 @@ class SellDraftController extends Controller
         if ($inventory->quantity < 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'Stok tidak mencukupi'
+                'message' => 'Stok tidak mencukupi',
             ], 400);
         }
 
@@ -506,8 +559,8 @@ class SellDraftController extends Controller
             'message' => 'Quantity updated successfully',
             'data' => [
                 'quantity' => $sellCart->quantity,
-                'subtotal' => $sellCart->price * $sellCart->quantity - $sellCart->diskon
-            ]
+                'subtotal' => $sellCart->price * $sellCart->quantity - $sellCart->diskon,
+            ],
         ]);
     }
 }

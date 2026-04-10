@@ -570,21 +570,46 @@ class SellController extends Controller
 
             foreach ($requests as $inputRequest) {
                 $productId = $inputRequest['product_id'];
+                $product = Product::find($productId);
+
+                if (! $product) {
+                    DB::rollBack();
+
+                    return response()->json(['errors' => ['Produk tidak ditemukan.']], 422);
+                }
 
                 // Process quantity_dus if it exists
                 if (isset($inputRequest['quantity_dus']) && $inputRequest['quantity_dus']) {
+                    $validationError = $this->validateSellPriceInput($inputRequest['price_dus'] ?? null, $product->name, 'dus');
+                    if ($validationError !== null) {
+                        DB::rollBack();
+
+                        return response()->json(['errors' => [$validationError]], 422);
+                    }
                     $this->processCartItem($productId, $inputRequest['quantity_dus'], $inputRequest['unit_dus'], $inputRequest['price_dus'], $inputRequest['diskon_dus'] ?? 0);
                     $this->decreaseInventory($productId, $inputRequest['quantity_dus'], $inputRequest['unit_dus']);
                 }
 
                 // Process quantity_pak if it exists
                 if (isset($inputRequest['quantity_pak']) && $inputRequest['quantity_pak']) {
+                    $validationError = $this->validateSellPriceInput($inputRequest['price_pak'] ?? null, $product->name, 'pak');
+                    if ($validationError !== null) {
+                        DB::rollBack();
+
+                        return response()->json(['errors' => [$validationError]], 422);
+                    }
                     $this->processCartItem($productId, $inputRequest['quantity_pak'], $inputRequest['unit_pak'], $inputRequest['price_pak'], $inputRequest['diskon_pak'] ?? 0);
                     $this->decreaseInventory($productId, $inputRequest['quantity_pak'], $inputRequest['unit_pak']);
                 }
 
                 // Process quantity_eceran if it exists
                 if (isset($inputRequest['quantity_eceran']) && $inputRequest['quantity_eceran']) {
+                    $validationError = $this->validateSellPriceInput($inputRequest['price_eceran'] ?? null, $product->name, 'eceran');
+                    if ($validationError !== null) {
+                        DB::rollBack();
+
+                        return response()->json(['errors' => [$validationError]], 422);
+                    }
                     $this->processCartItem($productId, $inputRequest['quantity_eceran'], $inputRequest['unit_eceran'], $inputRequest['price_eceran'], $inputRequest['diskon_eceran'] ?? 0);
                     $this->decreaseInventory($productId, $inputRequest['quantity_eceran'], $inputRequest['unit_eceran']);
                 }
@@ -598,6 +623,30 @@ class SellController extends Controller
         }
 
         return response()->json(['success' => 'Items added to cart successfully.'], 200);
+    }
+
+    private function validateSellPriceInput($priceInput, string $productName, string $unitName): ?string
+    {
+        $normalizedPrice = $this->normalizeSellPriceInput($priceInput);
+        if ($normalizedPrice === null || $normalizedPrice <= 0) {
+            return "Harga jual produk {$productName} ({$unitName}) harus lebih dari 0.";
+        }
+
+        return null;
+    }
+
+    private function normalizeSellPriceInput($priceInput): ?float
+    {
+        if ($priceInput === null || $priceInput === '') {
+            return null;
+        }
+
+        $normalizedPrice = str_replace(',', '', (string) $priceInput);
+        if (! is_numeric($normalizedPrice)) {
+            return null;
+        }
+
+        return (float) $normalizedPrice;
     }
 
     private function processCartItem($productId, $quantity, $unitId, $price, $discount)

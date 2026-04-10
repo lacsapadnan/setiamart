@@ -1046,8 +1046,21 @@
                             location.reload();
                         },
                         error: function(xhr, status, error) {
-                            var err = eval("(" + xhr.responseText + ")");
-                            console.log(err);
+                            var message = 'Gagal menambahkan item ke keranjang.';
+
+                            if (xhr.status === 422 && xhr.responseJSON) {
+                                if (Array.isArray(xhr.responseJSON.errors) && xhr.responseJSON.errors.length > 0) {
+                                    message = xhr.responseJSON.errors[0];
+                                } else if (xhr.responseJSON.message) {
+                                    message = xhr.responseJSON.message;
+                                }
+                            }
+
+                            if (typeof toastr !== 'undefined') {
+                                toastr.error(message);
+                            } else {
+                                alert(message);
+                            }
                         }
                     });
                 });
