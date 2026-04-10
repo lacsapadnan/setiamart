@@ -375,6 +375,10 @@
     "use strict";
 
         let reportData = null;
+        let incomeStatementPollingTimer = null;
+        let incomeStatementPollingAttempts = 0;
+        const INCOME_STATEMENT_POLLING_MAX_ATTEMPTS = 20;
+        const INCOME_STATEMENT_POLLING_INTERVAL_MS = 3000;
 
         $(document).ready(function() {
             // Add CSRF token to all AJAX requests
@@ -470,8 +474,7 @@
                 });
             });
 
-            // Auto-generate report on page load
-            generateReport();
+            // Keep report generation manual via the "Generate Laporan" button.
         });
 
         function initializeDataTables() {
@@ -604,12 +607,38 @@
                 },
                 timeout: 300000, // 5 minutes timeout
                 success: function(response) {
+                    const status = response?.status;
+
+                    if (status === 'pending') {
+                        toastr.info('Laporan sedang diproses. Anda akan diberi notifikasi saat data siap.');
+                        startIncomeStatementPolling(fromDate, toDate, warehouse, user);
+                        return;
+                    }
+
+                    if (status === 'failed') {
+                        Swal.fire({
+                            title: 'Error!',
+                            text: response?.error || 'Gagal memproses laporan laba rugi.',
+                            icon: 'error'
+                        });
+                        return;
+                    }
+
+                    if (!response?.period?.warehouse) {
+                        Swal.fire({
+                            title: 'Error!',
+                            text: 'Format response laporan tidak valid.',
+                            icon: 'error'
+                        });
+                        return;
+                    }
+
                     reportData = response;
                     populateReport(response);
                     $('#reportContent').show();
                     $('#exportReport').show();
+                    stopIncomeStatementPolling();
 
-                    // Show cache info if available
                     if (response.cache_generated_at) {
                         toastr.info(`Data loaded from cache (generated at: ${new Date(response.cache_generated_at).toLocaleString()})`);
                     }
@@ -661,6 +690,87 @@
             });
         }
 
+        function startIncomeStatementPolling(fromDate, toDate, warehouse, user) {
+            stopIncomeStatementPolling();
+            incomeStatementPollingAttempts = 0;
+
+            incomeStatementPollingTimer = setInterval(function() {
+                incomeStatementPollingAttempts++;
+
+                if (incomeStatementPollingAttempts > INCOME_STATEMENT_POLLING_MAX_ATTEMPTS) {
+                    stopIncomeStatementPolling();
+                    toastr.warning('Proses laporan masih berjalan. Silakan klik Generate lagi beberapa saat.');
+                    return;
+                }
+
+                const isAllBranches = warehouse === 'all_branches';
+                const warehouseId = isAllBranches ? '' : warehouse;
+
+                $.ajax({
+                    url: '{{ route('api.income-statement') }}',
+                    type: 'GET',
+                    data: {
+                        from_date: fromDate,
+                        to_date: toDate,
+                        warehouse: warehouseId,
+                        user_id: user,
+                        all_branches: isAllBranches
+                    },
+                    success: function(response) {
+                        const status = response?.status;
+
+                        if (status === 'pending') {
+                            return;
+                        }
+
+                        stopIncomeStatementPolling();
+
+                        if (status === 'failed') {
+                            Swal.fire({
+                                title: 'Error!',
+                                text: response?.error || 'Gagal memproses laporan laba rugi.',
+                                icon: 'error'
+                            });
+                            return;
+                        }
+
+                        if (!response?.period?.warehouse) {
+                            Swal.fire({
+                                title: 'Error!',
+                                text: 'Format response laporan tidak valid.',
+                                icon: 'error'
+                            });
+                            return;
+                        }
+
+                        reportData = response;
+                        populateReport(response);
+                        $('#reportContent').show();
+                        $('#exportReport').show();
+
+                        Swal.fire({
+                            title: 'Laporan Siap',
+                            text: 'Data laporan berhasil diproses dan ditampilkan.',
+                            icon: 'success',
+                            timer: 1800,
+                            showConfirmButton: false
+                        });
+                    },
+                    error: function() {
+                        // Keep polling on transient network/server errors.
+                    }
+                });
+            }, INCOME_STATEMENT_POLLING_INTERVAL_MS);
+        }
+
+        function stopIncomeStatementPolling() {
+            if (incomeStatementPollingTimer) {
+                clearInterval(incomeStatementPollingTimer);
+                incomeStatementPollingTimer = null;
+            }
+            incomeStatementPollingAttempts = 0;
+        }
+
         function clearCache() {
             const fromDate = $('#fromDateFilter').val();
             const toDate = $('#toDateFilter').val();
@@ -689,6 +799,7 @@
                     _token: '{{ csrf_token() }}'
                 },
                 success: function(response) {
+                    stopIncomeStatementPolling();
                     toastr.success('Cache berhasil dihapus. Silakan generate laporan lagi.');
                 },
                 error: function(xhr, status, error) {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\ProductExport;
+use App\Http\Requests\ProductImportRequest;
 use App\Http\Requests\ProductRequest;
 use App\Imports\ProductImport;
 use App\Jobs\GenerateBarcodePDF;
@@ -14,6 +15,7 @@ use App\Models\Unit;
 use App\Models\Warehouse;
 use Illuminate\Bus\Batch;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -45,7 +47,34 @@ class ProductController extends Controller
         $searchQuery = $request->input('searchQuery');
         $selectedCategory = $request->input('category');
 
-        $query = Product::with('unit_dus', 'unit_pak', 'unit_eceran');
+        $query = Product::query()
+            ->select([
+                'id',
+                'name',
+                'group',
+                'promo',
+                'promo_out_of_town',
+                'unit_dus',
+                'unit_pak',
+                'unit_eceran',
+                'dus_to_eceran',
+                'pak_to_eceran',
+                'lastest_price_eceran',
+                'lastest_price_eceran_out_of_town',
+                'price_sell_dus',
+                'price_sell_pak',
+                'price_sell_eceran',
+                'price_sell_dus_out_of_town',
+                'price_sell_pak_out_of_town',
+                'price_sell_eceran_out_of_town',
+                'hadiah',
+                'hadiah_out_of_town',
+                'barcode_dus',
+                'barcode_pak',
+                'barcode_eceran',
+                'isShow',
+            ])
+            ->with('unit_dus', 'unit_pak', 'unit_eceran');
 
         if ($searchQuery) {
             $query->where(function ($innerQuery) use ($searchQuery) {
@@ -192,13 +221,10 @@ class ProductController extends Controller
             ->with('success', 'Produk berhasil dihapus');
     }
 
-    public function import(Request $request)
+    public function import(ProductImportRequest $request)
     {
-        $request->validate([
-            'file' => 'required|mimes:csv,xlsx',
-        ]);
-
-        Excel::import(new ProductImport, $request->file('file'));
+        $validated = $request->validated();
+        Excel::import(new ProductImport, $validated['file']);
 
         return redirect()
             ->back()
@@ -253,7 +279,7 @@ class ProductController extends Controller
 
             $batchId = (string) Str::uuid();
             $filename = 'barcode_labels_'.date('Y-m-d_His').'_'.$batchId.'.pdf';
-            $userId = auth()->id();
+            $userId = Auth::user()?->id;
 
             // Chunk products into smaller batches (50 products per job for faster processing)
             $chunks = array_chunk($validProducts, 50);

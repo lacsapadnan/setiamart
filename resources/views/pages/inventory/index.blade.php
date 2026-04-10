@@ -137,335 +137,105 @@
 @push('addon-script')
 <script src="assets/plugins/custom/datatables/datatables.bundle.js"></script>
 <script>
-    "use strict";
+    $(function () {
+        const canUpdateInventory = @json(auth()->user()->can('update inventory'));
+        const canDeleteInventory = @json(auth()->user()->can('hapus inventory'));
+        const csrfToken = '{{ csrf_token() }}';
 
-        // Class definition
-        var KTDatatablesExample = function() {
-            // Shared variables
-            var table;
-            var datatable;
-
-            // Private functions
-            var initDatatable = function() {
-                // Set date data order
-                const tableRows = table.querySelectorAll('tbody tr');
-
-                // Init datatable --- more info on datatables: https://datatables.net/manual/
-                datatable = $(table).DataTable({
-                    serverSide: true,     // <-- PENTING
-                    processing: true,     // <-- Tambah ini untuk spinner
-                    order: [],
-                    pageLength: 10,
-                    "dom": '<"top"lp>rt<"bottom"lp><"clear">',
-                    ajax: {
-                        url: '{{ route('api.inventori') }}',
-                        type: 'GET',
-                    },
-                    columns: [
-                        { data: 'warehouse.name', name: 'warehouse.name' },
-                        { data: 'product.group', name: 'product.group' },
-                        { data: 'product.name', name: 'product.name' },
-                        { data: 'product.dus_to_eceran', name: 'product.dus_to_eceran' },
-                        { data: 'product.pak_to_eceran', name: 'product.pak_to_eceran' },
-                        { data: 'quantity', name: 'quantity' },
-                        {
-                            data: 'id',
-                            orderable: false,
-                            searchable: false,
-                            render: function(data, type, row) {
-                                return `
-                                    @can('update inventory')
-                                        <button type="button" class="btn btn-primary edit-button" data-id="${data}" data-toggle="modal" data-target="#editModal">Edit</button>
-                                    @endcan
-                                    @can('hapus inventory')
-                                        <form action="/inventori/${data}" method="POST" class="d-inline">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-danger">Hapus</button>
-                                        </form>
-                                    @endcan
-                                `;
-                            }
-                        }
-                    ],
-                });
-
-                $('#categoryFilter').on('change', function() {
-                    var category = this.value;
-                    var warehouseId = $('#warehouseFilter').val();
-                    datatable.ajax.url('{{ route('api.inventori') }}?category=' + category + '&warehouse_id=' + warehouseId).load();
-                });
-
-                $('#warehouseFilter').on('change', function() {
-                    var warehouseId = this.value;
-                    var category = $('#categoryFilter').val();
-                    datatable.ajax.url('{{ route('api.inventori') }}?category=' + category + '&warehouse_id=' + warehouseId).load();
-                });
-            }
-
-            // Hook export buttons
-            var exportButtons = () => {
-                const documentTitle = 'Inventory Data Report';
-
-                // Hook dropdown menu click event to custom export functions
-                const exportButtons = document.querySelectorAll(
-                    '#kt_datatable_example_export_menu [data-kt-export]');
-                exportButtons.forEach(exportButton => {
-                    exportButton.addEventListener('click', e => {
-                        e.preventDefault();
-
-                        // Get clicked export value
-                        const exportValue = e.target.getAttribute('data-kt-export');
-
-                        // Get current filter values
-                        const category = $('#categoryFilter').val();
-                        const warehouseId = $('#warehouseFilter').val();
-
-                        // Call custom export function with all data
-                        exportAllData(exportValue, category, warehouseId, documentTitle);
-                    });
-                });
-            }
-
-                        // Function to export all data
-            var exportAllData = (exportType, category, warehouseId, title) => {
-                // Build URL with current filters
-                let url = '{{ route('api.inventori.export') }}';
-                const params = new URLSearchParams();
-                if (category) params.append('category', category);
-                if (warehouseId) params.append('warehouse_id', warehouseId);
-                if (params.toString()) url += '?' + params.toString();
-
-                // Fetch all data
-                $.ajax({
-                    url: url,
-                    method: 'GET',
-                    success: function(response) {
-                        if (exportType === 'copy') {
-                            copyToClipboard(response.data, title);
-                        } else if (exportType === 'excel') {
-                            exportToExcel(response.data, title);
-                        } else if (exportType === 'csv') {
-                            exportToCSV(response.data, title);
-                        } else if (exportType === 'pdf') {
-                            exportToPDF(response.data, title);
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        console.error('Export failed:', error);
-                        alert('Export failed. Please try again.');
-                    }
-                });
-            }
-
-            // Copy to clipboard function
-            var copyToClipboard = (data, title) => {
-                let text = 'Cabang\tKelompok\tNama Barang\tJml Per Dus\tJml Per Pak\tStok\n';
-                data.forEach(function(row) {
-                    text += `${row.warehouse}\t${row.category}\t${row.product_name}\t${row.dus_to_eceran}\t${row.pak_to_eceran}\t${row.quantity}\n`;
-                });
-
-                navigator.clipboard.writeText(text).then(function() {
-                    alert('Data copied to clipboard!');
-                }, function(err) {
-                    console.error('Could not copy text: ', err);
-                    alert('Failed to copy to clipboard.');
-                });
-            }
-
-            // Export to Excel function
-            var exportToExcel = (data, title) => {
-                // Create workbook and worksheet
-                const headers = ['Cabang', 'Kelompok', 'Nama Barang', 'Jml Per Dus', 'Jml Per Pak', 'Stok'];
-
-                // Create HTML table for Excel
-                let htmlTable = '<table border="1">';
-
-                // Add header row
-                htmlTable += '<thead><tr>';
-                headers.forEach(header => {
-                    htmlTable += `<th style="background-color: #f2f2f2; font-weight: bold;">${header}</th>`;
-                });
-                htmlTable += '</tr></thead>';
-
-                // Add data rows
-                htmlTable += '<tbody>';
-                data.forEach(row => {
-                    htmlTable += '<tr>';
-                    htmlTable += `<td>${row.warehouse || ''}</td>`;
-                    htmlTable += `<td>${row.category || ''}</td>`;
-                    htmlTable += `<td>${row.product_name || ''}</td>`;
-                    htmlTable += `<td>${row.dus_to_eceran || ''}</td>`;
-                    htmlTable += `<td>${row.pak_to_eceran || ''}</td>`;
-                    htmlTable += `<td>${row.quantity || 0}</td>`;
-                    htmlTable += '</tr>';
-                });
-                htmlTable += '</tbody></table>';
-
-                // Create Excel file using a simpler approach without problematic XML
-                const excelContent = `
-                    <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <style>
-                            table { border-collapse: collapse; width: 100%; }
-                            th, td { border: 1px solid #000; padding: 8px; text-align: left; }
-                            th { background-color: #f2f2f2; font-weight: bold; }
-                        </style>
-                    </head>
-                    <body>${htmlTable}</body>
-                    </html>
-                `;
-
-                const blob = new Blob([excelContent], {
-                    type: 'application/vnd.ms-excel;charset=utf-8;'
-                });
-
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = title.replace(/ /g, '_').toLowerCase() + '.xls';
-                link.click();
-                URL.revokeObjectURL(link.href);
-            }
-
-            // Export to CSV function
-            var exportToCSV = (data, title) => {
-                const headers = ['Cabang', 'Kelompok', 'Nama Barang', 'Jml Per Dus', 'Jml Per Pak', 'Stok'];
-                const csvContent = [
-                    headers.join(','),
-                    ...data.map(row => [
-                        `"${row.warehouse}"`,
-                        `"${row.category}"`,
-                        `"${row.product_name}"`,
-                        `"${row.dus_to_eceran}"`,
-                        `"${row.pak_to_eceran}"`,
-                        `"${row.quantity}"`
-                    ].join(','))
-                ].join('\n');
-
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = title.replace(/ /g, '_').toLowerCase() + '.csv';
-                link.click();
-                URL.revokeObjectURL(link.href);
-            }
-
-            // Export to PDF function (simple table format)
-            var exportToPDF = (data, title) => {
-                // Create a simple HTML table for PDF export
-                let htmlContent = `
-                    <html>
-                    <head>
-                        <title>${title}</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; margin: 20px; }
-                            h1 { text-align: center; margin-bottom: 30px; }
-                            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                            th { background-color: #f2f2f2; font-weight: bold; }
-                            tr:nth-child(even) { background-color: #f9f9f9; }
-                        </style>
-                    </head>
-                    <body>
-                        <h1>${title}</h1>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Cabang</th>
-                                    <th>Kelompok</th>
-                                    <th>Nama Barang</th>
-                                    <th>Jml Per Dus</th>
-                                    <th>Jml Per Pak</th>
-                                    <th>Stok</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-
-                data.forEach(function(row) {
-                    htmlContent += `
-                        <tr>
-                            <td>${row.warehouse}</td>
-                            <td>${row.category}</td>
-                            <td>${row.product_name}</td>
-                            <td>${row.dus_to_eceran}</td>
-                            <td>${row.pak_to_eceran}</td>
-                            <td>${row.quantity}</td>
-                        </tr>
-                    `;
-                });
-
-                htmlContent += `
-                            </tbody>
-                        </table>
-                    </body>
-                    </html>
-                `;
-
-                // Open in new window for printing/saving as PDF
-                const printWindow = window.open('', '_blank');
-                printWindow.document.write(htmlContent);
-                printWindow.document.close();
-                printWindow.focus();
-                setTimeout(() => {
-                    printWindow.print();
-                }, 500);
-            }
-
-            // Search Datatable --- official docs reference: https://datatables.net/reference/api/search()
-            var handleSearchDatatable = () => {
-                const filterSearch = document.querySelector('[data-kt-filter="search"]');
-                filterSearch.addEventListener('keyup', function(e) {
-                    datatable.search(e.target.value).draw();
-                });
-            }
-
-            // Public methods
-            return {
-                init: function() {
-                    table = document.querySelector('#kt_datatable_example');
-
-                    if (!table) {
-                        return;
-                    }
-
-                    initDatatable();
-                    exportButtons();
-                    handleSearchDatatable();
+        const dataTable = $('#kt_datatable_example').DataTable({
+            serverSide: true,
+            processing: true,
+            order: [],
+            pageLength: 10,
+            dom: '<"top"lp>rt<"bottom"lp><"clear">',
+            ajax: {
+                url: '{{ route('api.inventori') }}',
+                type: 'GET',
+                data: function (d) {
+                    d.category = $('#categoryFilter').val() || '';
+                    d.warehouse_id = $('#warehouseFilter').val() || '';
                 }
-            };
-        }();
-
-        // On document ready
-        KTUtil.onDOMContentLoaded(function() {
-            KTDatatablesExample.init();
+            },
+            columns: [
+                { data: 'warehouse.name', name: 'warehouse.name', defaultContent: '' },
+                { data: 'product.group', name: 'product.group', defaultContent: '' },
+                { data: 'product.name', name: 'product.name', defaultContent: '' },
+                { data: 'product.dus_to_eceran', name: 'product.dus_to_eceran', defaultContent: '' },
+                { data: 'product.pak_to_eceran', name: 'product.pak_to_eceran', defaultContent: '' },
+                { data: 'quantity', name: 'quantity', defaultContent: 0 },
+                {
+                    data: 'id',
+                    orderable: false,
+                    searchable: false,
+                    render: function (data) {
+                        let html = '';
+                        if (canUpdateInventory) {
+                            html += '<button type="button" class="btn btn-sm btn-primary edit-button" data-id="' + data + '" data-toggle="modal" data-target="#editModal">Edit</button> ';
+                        }
+                        if (canDeleteInventory) {
+                            html += '<form action="/inventori/' + data + '" method="POST" class="d-inline">';
+                            html += '<input type="hidden" name="_token" value="' + csrfToken + '">';
+                            html += '<input type="hidden" name="_method" value="DELETE">';
+                            html += '<button type="submit" class="btn btn-sm btn-danger">Hapus</button>';
+                            html += '</form>';
+                        }
+                        return html;
+                    }
+                }
+            ],
+            buttons: [
+                { extend: 'copyHtml5', title: 'Inventory Data Report', exportOptions: { columns: [0, 1, 2, 3, 4, 5] } },
+                { extend: 'excelHtml5', title: 'Inventory Data Report', exportOptions: { columns: [0, 1, 2, 3, 4, 5] } },
+                { extend: 'csvHtml5', title: 'Inventory Data Report', exportOptions: { columns: [0, 1, 2, 3, 4, 5] } },
+                { extend: 'pdfHtml5', title: 'Inventory Data Report', orientation: 'landscape', pageSize: 'A4', exportOptions: { columns: [0, 1, 2, 3, 4, 5] } }
+            ]
         });
-</script>
-<script>
-    $(document).on('click', '.edit-button', function() {
-            var id = $(this).data('id');
-            // Make an AJAX request to fetch the data based on the id
-            $.ajax({
-                url: '/inventori/' + id +
-                    '/edit', // Update the URL to your Laravel route that fetches the data
-                method: 'GET',
-                success: function(response) {
-                    console.log(response);
-                    $('#editInventoryId').val(response.id);
-                    $('#productInput').val(response.product_id).trigger(
-                        'change'); // Update select form1 value and trigger change event
-                    $('#cabangInput').val(response.warehouse_id).trigger(
-                        'change'); // Update select form2 value and trigger change event
-                    $('#quantityInput').val(response.quantity);
 
+        dataTable.buttons().container().appendTo('#kt_datatable_example_buttons');
+
+        $('[data-kt-filter="search"]').on('keyup', function () {
+            dataTable.search(this.value).draw();
+        });
+
+        $('#categoryFilter, #warehouseFilter').on('change', function () {
+            dataTable.ajax.reload();
+        });
+
+        $('#kt_datatable_example_export_menu [data-kt-export="copy"]').on('click', function (e) {
+            e.preventDefault();
+            dataTable.button('.buttons-copy').trigger();
+        });
+        $('#kt_datatable_example_export_menu [data-kt-export="excel"]').on('click', function (e) {
+            e.preventDefault();
+            dataTable.button('.buttons-excel').trigger();
+        });
+        $('#kt_datatable_example_export_menu [data-kt-export="csv"]').on('click', function (e) {
+            e.preventDefault();
+            dataTable.button('.buttons-csv').trigger();
+        });
+        $('#kt_datatable_example_export_menu [data-kt-export="pdf"]').on('click', function (e) {
+            e.preventDefault();
+            dataTable.button('.buttons-pdf').trigger();
+        });
+
+        $(document).on('click', '.edit-button', function () {
+            const id = $(this).data('id');
+            $.ajax({
+                url: '/inventori/' + id + '/edit',
+                method: 'GET',
+                success: function (response) {
+                    $('#editInventoryId').val(response.id);
+                    $('#productInput').val(response.product_id).trigger('change');
+                    $('#cabangInput').val(response.warehouse_id).trigger('change');
+                    $('#quantityInput').val(response.quantity);
                     $('#editForm').attr('action', '/inventori/' + id);
                     $('#editModal').modal('show');
                 },
-                error: function(error) {
+                error: function (error) {
                     console.error('Error fetching data:', error);
                 }
             });
         });
+    });
 </script>
 @endpush

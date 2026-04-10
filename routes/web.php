@@ -181,7 +181,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::get('penjualan/retur/api/data', [SellReturController::class, 'dataSell'])->name('api.penjualan-retur');
     Route::get('pembelian/retur/api/data', [PurchaseReturController::class, 'dataPurchase'])->name('api.pembelian-retur');
     Route::get('laporan-produk/api/data', [ProductReportController::class, 'data'])->name('api.laporan-produk');
-    Route::get('laba-rugi/api/data', [IncomeStatementController::class, 'data'])->name('api.income-statement');
+    Route::get('laba-rugi/api/data', [IncomeStatementController::class, 'data'])->middleware('throttle:30,1')->name('api.income-statement');
     Route::post('laba-rugi/api/clear-cache', [IncomeStatementController::class, 'clearCache'])->name('api.income-statement.clear-cache');
     Route::get('karyawan/api/data', [EmployeeController::class, 'data'])->name('api.karyawan');
     Route::get('pindah-stok-draft/api/data', [SendStockDraftController::class, 'data'])->name('api.pindah-stok-draft');
@@ -255,7 +255,7 @@ Route::group(['middleware' => ['auth']], function () {
 
     // Income Statement Routes
     Route::get('/income-statement', [IncomeStatementController::class, 'index'])->name('income-statement.index');
-    Route::get('/income-statement/data', [IncomeStatementController::class, 'data'])->name('income-statement.data');
+    Route::get('/income-statement/data', [IncomeStatementController::class, 'data'])->middleware('throttle:30,1')->name('income-statement.data');
     Route::post('/income-statement/clear-cache', [IncomeStatementController::class, 'clearCache'])->name('income-statement.clear-cache');
 
     // Activity Log Routes

@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\InventoryDataRequest;
+use App\Http\Requests\InventoryExportRequest;
 use App\Http\Requests\InventoryRequest;
+use App\Http\Requests\InventoryUpdateRequest;
 use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class InventoryController extends Controller
 {
@@ -23,12 +28,13 @@ class InventoryController extends Controller
         return view('pages.inventory.index', compact('product', 'warehouse', 'categories'));
     }
 
-    public function data(Request $request)
+    public function data(InventoryDataRequest $request)
     {
         try {
-            $userRoles = auth()->user()->roles->pluck('name');
-            $category = $request->input('category');
-            $warehouseId = $request->input('warehouse_id');
+            $validated = $request->validated();
+            $userRoles = Auth::user()->roles->pluck('name');
+            $category = $validated['category'] ?? null;
+            $warehouseId = $validated['warehouse_id'] ?? null;
 
             $query = Inventory::with(['product', 'warehouse']);
 
@@ -39,7 +45,7 @@ class InventoryController extends Controller
             }
 
             if ($userRoles[0] != 'master') {
-                $query->where('warehouse_id', auth()->user()->warehouse_id);
+                $query->where('warehouse_id', Auth::user()->warehouse_id);
             } elseif ($warehouseId) {
                 $query->where('warehouse_id', $warehouseId);
             }
@@ -47,7 +53,7 @@ class InventoryController extends Controller
             return datatables()->eloquent($query)->toJson();
         } catch (\Exception $e) {
             report($e);
-            \Log::error('InventoryController data method error: '.$e->getMessage(), [
+            Log::error('InventoryController data method error: '.$e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
@@ -60,12 +66,13 @@ class InventoryController extends Controller
         }
     }
 
-    public function exportData(Request $request)
+    public function exportData(InventoryExportRequest $request)
     {
         try {
-            $userRoles = auth()->user()->roles->pluck('name');
-            $category = $request->input('category');
-            $warehouseId = $request->input('warehouse_id');
+            $validated = $request->validated();
+            $userRoles = Auth::user()->roles->pluck('name');
+            $category = $validated['category'] ?? null;
+            $warehouseId = $validated['warehouse_id'] ?? null;
 
             $query = Inventory::with(['product', 'warehouse']);
 
@@ -76,7 +83,7 @@ class InventoryController extends Controller
             }
 
             if ($userRoles[0] != 'master') {
-                $query->where('warehouse_id', auth()->user()->warehouse_id);
+                $query->where('warehouse_id', Auth::user()->warehouse_id);
             } elseif ($warehouseId) {
                 $query->where('warehouse_id', $warehouseId);
             }
@@ -99,7 +106,7 @@ class InventoryController extends Controller
             ]);
         } catch (\Exception $e) {
             report($e);
-            \Log::error('InventoryController exportData method error: '.$e->getMessage(), [
+            Log::error('InventoryController exportData method error: '.$e->getMessage(), [
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
@@ -117,7 +124,7 @@ class InventoryController extends Controller
         $searchQuery = $request->input('searchQuery');
 
         $query = Inventory::with('product', 'warehouse')
-            ->where('warehouse_id', auth()->user()->warehouse_id)
+            ->where('warehouse_id', Auth::user()->warehouse_id)
             ->whereHas('product', function ($query) {
                 $query->where('isShow', true);
             });
@@ -193,10 +200,10 @@ class InventoryController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(InventoryUpdateRequest $request, string $id)
     {
         $inventory = Inventory::findOrFail($id);
-        $inventory->update($request->all());
+        $inventory->update($request->validated());
 
         return redirect()->route('inventori.index')->with('success', 'Inventory berhasil diubah');
     }

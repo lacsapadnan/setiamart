@@ -8,24 +8,41 @@
 <link href="{{ URL::asset('assets/plugins/custom/datatables/datatables.bundle.css') }}" rel="stylesheet"
     type="text/css" />
 <style>
-    ::-webkit-scrollbar-thumb {
-        -webkit-border-radius: 10px;
-        border-radius: 10px;
-        background: rgba(192, 192, 192, 0.3);
-        -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-        background-color: #818B99;
+    #kt_datatable_example_wrapper .dataTables_scrollBody {
+        overflow-x: scroll !important;
+        overflow-y: auto !important;
     }
 
-    .dataTables_scrollBody {
-        transform: rotateX(180deg);
+    #kt_datatable_example_wrapper .dataTables_scrollBody::-webkit-scrollbar {
+        height: 10px;
+        display: block;
     }
 
-    .dataTables_scrollBody::-webkit-scrollbar {
-        height: 16px;
+    #kt_datatable_example_wrapper .dataTables_scrollBody::-webkit-scrollbar-track {
+        background: #e9ecef;
+        border-radius: 5px;
+    }
+
+    #kt_datatable_example_wrapper .dataTables_scrollBody::-webkit-scrollbar-thumb {
+        background: #818B99;
+        border-radius: 5px;
+    }
+
+    #kt_datatable_example_wrapper .dataTables_scrollBody::-webkit-scrollbar-thumb:hover {
+        background: #555;
     }
 
     .dataTables_scrollBody table {
-        transform: rotateX(180deg);
+        transform: none !important;
+    }
+
+    #kt_datatable_example {
+        min-width: 2200px;
+    }
+
+    #kt_datatable_example th,
+    #kt_datatable_example td {
+        white-space: nowrap;
     }
 </style>
 @endpush
@@ -64,7 +81,7 @@
                 Import Data Data
             </button>
             @endcan
-            <button type="button" class="btn btn-light-primary" id="printBarcodeBtn">
+            {{-- <button type="button" class="btn btn-light-primary" id="printBarcodeBtn">
                 <i class="ki-duotone ki-barcode fs-2">
                     <span class="path1"></span>
                     <span class="path2"></span>
@@ -76,7 +93,7 @@
                     <span class="path8"></span>
                 </i>
                 Cetak Barcode
-            </button>
+            </button> --}}
             @can('simpan produk')
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_1">
                 Tambah Data
@@ -394,8 +411,12 @@
             // Search Datatable --- official docs reference: https://datatables.net/reference/api/search()
             var handleSearchDatatable = () => {
                 const filterSearch = document.querySelector('[data-kt-filter="search"]');
+                let searchDebounceTimer = null;
                 filterSearch.addEventListener('keyup', function(e) {
-                    datatable.search(e.target.value).draw();
+                    clearTimeout(searchDebounceTimer);
+                    searchDebounceTimer = setTimeout(function() {
+                        datatable.search(e.target.value).draw();
+                    }, 300);
                 });
             }
 
