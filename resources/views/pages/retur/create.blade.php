@@ -110,7 +110,7 @@
                                         <button type="button" class="btn btn-sm btn-light-primary btn-icon qty-decrease" data-cart-id="{{ $cart->id }}">
                                             <i class="bi bi-dash"></i>
                                         </button>
-                                        <input type="number" class="form-control form-control-sm text-center qty-input" value="{{ $cart->quantity }}" readonly style="width: 60px;">
+                                        <input type="number" class="form-control form-control-sm text-center qty-input" value="{{ $cart->quantity }}" readonly step="0.01" min="0.01" style="width: 80px;">
                                         <button type="button" class="btn btn-sm btn-light-primary btn-icon qty-increase" data-cart-id="{{ $cart->id }}">
                                             <i class="bi bi-plus"></i>
                                         </button>
@@ -318,7 +318,7 @@
                             data: null,
                             render: function(data, type, row) {
                                 return `
-                                <input type="number" name="quantity_retur" class="form-control" min="0" step="0.01">
+                                <input type="number" name="quantity_retur" class="form-control" min="0.01" step="0.01">
                                 <input type="hidden" name="unit_retur" value="">
                                 <input type="hidden" name="price_retur" value="">
                                 <input type="hidden" name="sell_id" value="${id}">
@@ -507,9 +507,13 @@
             const cartId = button.data('cart-id');
             const row = $(`tr[data-cart-id="${cartId}"]`);
             const input = row.find('.qty-input');
-            const currentQty = parseInt(input.val());
+            const currentQty = parseFloat(input.val()) || 0;
             const isIncrease = button.hasClass('qty-increase');
-            const newQty = isIncrease ? currentQty + 1 : Math.max(1, currentQty - 1);
+            const step = 0.01;
+            const minQty = 0.01;
+            const newQty = isIncrease
+                ? Number((currentQty + step).toFixed(2))
+                : Number(Math.max(minQty, currentQty - step).toFixed(2));
 
             if (newQty === currentQty) return;
 

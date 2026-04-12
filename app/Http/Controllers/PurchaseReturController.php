@@ -17,8 +17,8 @@ use App\Models\Warehouse;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class PurchaseReturController extends Controller
 {
@@ -30,6 +30,7 @@ class PurchaseReturController extends Controller
         $masters = User::role('master')->get();
         $warehouses = Warehouse::all();
         $users = User::all();
+
         return view('pages.PurchaseRetur.index', compact('masters', 'warehouses', 'users'));
     }
 
@@ -43,11 +44,11 @@ class PurchaseReturController extends Controller
 
         $defaultDate = now()->format('Y-m-d');
 
-        if (!$fromDate) {
+        if (! $fromDate) {
             $fromDate = $defaultDate;
         }
 
-        if (!$toDate) {
+        if (! $toDate) {
             $toDate = $defaultDate;
         }
 
@@ -77,6 +78,7 @@ class PurchaseReturController extends Controller
         }
 
         $retur = $retur->get();
+
         return response()->json($retur);
     }
 
@@ -97,12 +99,14 @@ class PurchaseReturController extends Controller
             $detail->created_at = $detail->purchaseRetur->created_at;
             $detail->id = $detail->purchaseRetur->id;
         });
+
         return response()->json($returDetails);
     }
 
-    public function  dataDetail($id)
+    public function dataDetail($id)
     {
         $returDetail = PurchaseReturDetail::with('purchaseRetur', 'product', 'unit')->where('purchase_retur_id', $id)->get();
+
         return response()->json($returDetail);
     }
 
@@ -116,11 +120,11 @@ class PurchaseReturController extends Controller
 
         $defaultDate = now()->format('Y-m-d');
 
-        if (!$fromDate) {
+        if (! $fromDate) {
             $fromDate = $defaultDate;
         }
 
-        if (!$toDate) {
+        if (! $toDate) {
             $toDate = $defaultDate;
         }
 
@@ -149,6 +153,7 @@ class PurchaseReturController extends Controller
         }
 
         $purchases = $purchases->get();
+
         return response()->json($purchases);
     }
 
@@ -165,6 +170,7 @@ class PurchaseReturController extends Controller
         } else {
             $users = User::where('warehouse_id', auth()->user()->warehouse_id)->get();
         }
+
         return view('pages.PurchaseRetur.list-pembelian', compact('masters', 'warehouses', 'users'));
     }
 
@@ -180,7 +186,7 @@ class PurchaseReturController extends Controller
         // Get the purchase record to check status and calculate remaining debt
         $purchase = Purchase::where('id', $request->purchase_id)->first();
 
-        if (!$purchase) {
+        if (! $purchase) {
             return redirect()->back()->with('error', 'Data pembelian tidak ditemukan');
         }
 
@@ -196,8 +202,8 @@ class PurchaseReturController extends Controller
             if ($totalReturnPrice > $remainingDebt) {
                 return redirect()->back()->with(
                     'error',
-                    'Total retur (' . number_format($totalReturnPrice, 0, ',', '.') .
-                        ') tidak boleh melebihi sisa piutang (' . number_format($remainingDebt, 0, ',', '.') . ')'
+                    'Total retur ('.number_format($totalReturnPrice, 0, ',', '.').
+                        ') tidak boleh melebihi sisa piutang ('.number_format($remainingDebt, 0, ',', '.').')'
                 );
             }
         }
@@ -243,7 +249,9 @@ class PurchaseReturController extends Controller
                 ->get();
             $remainingToDeduct = $returnQuantityInEceran;
             foreach ($purchaseDetails as $purchaseDetail) {
-                if ($remainingToDeduct <= 0) break;
+                if ($remainingToDeduct <= 0) {
+                    break;
+                }
                 $purchaseDetailEceran = $this->convertToEceran($purchaseDetail->quantity, $purchaseDetail->unit_id, $product);
                 if ($purchaseDetailEceran > 0) {
                     $deductEceran = min($remainingToDeduct, $purchaseDetailEceran);
@@ -258,9 +266,9 @@ class PurchaseReturController extends Controller
         }
 
         PurchaseReturCart::where('user_id', auth()->id())->delete();
+
         return redirect()->route('pembelian-retur.index')->with('success', 'Retur berhasil disimpan');
     }
-
 
     public function konfirmReturnPembelian(Request $request)
     {
@@ -292,7 +300,9 @@ class PurchaseReturController extends Controller
                 $remainingToDeduct = $returnQuantityInEceran;
                 $totalPriceForThisReturn = 0;
                 foreach ($purchaseDetails as $purchaseDetail) {
-                    if ($remainingToDeduct <= 0) break;
+                    if ($remainingToDeduct <= 0) {
+                        break;
+                    }
                     $purchaseDetailEceran = $this->convertToEceran($purchaseDetail->quantity, $purchaseDetail->unit_id, $product);
                     if ($purchaseDetailEceran > 0) {
                         $deductEceran = min($remainingToDeduct, $purchaseDetailEceran);
@@ -334,7 +344,7 @@ class PurchaseReturController extends Controller
                     'price' => $rc->price,
                     'for' => 'KELUAR',
                     'type' => 'RETUR PEMBELIAN',
-                    'description' => 'Retur Pembelian ' . $purchase->order_number,
+                    'description' => 'Retur Pembelian '.$purchase->order_number,
                 ]);
             }
             // update remark menjadi verify
@@ -346,12 +356,13 @@ class PurchaseReturController extends Controller
                 'warehouse_id' => auth()->user()->warehouse_id,
                 'user_id' => auth()->id(),
                 'for' => 'Retur pembelian',
-                'description' => 'Retur Pembelian ' . $purchase->order_number . ' Supplier ' . $purchase->supplier->name,
+                'description' => 'Retur Pembelian '.$purchase->order_number.' Supplier '.$purchase->supplier->name,
                 'in' => $totalPrice,
                 'out' => 0,
                 'payment_method' => null,
             ]);
         }
+
         return response()->json(['message' => 'Return confirmed successfully']);
     }
 
@@ -369,6 +380,7 @@ class PurchaseReturController extends Controller
         foreach ($cart as $c) {
             $subtotal += $c->price * $c->quantity;
         }
+
         return view('pages.PurchaseRetur.create', compact('pembelian', 'cart', 'subtotal', 'purchaseId'));
     }
 
@@ -403,7 +415,7 @@ class PurchaseReturController extends Controller
             $userRoles = auth()->user()->getRoleNames();
             if ($userRoles[0] !== 'master' && $purchaseRetur->user_id !== auth()->id()) {
                 return response()->json([
-                    'error' => 'Unauthorized to delete this return'
+                    'error' => 'Unauthorized to delete this return',
                 ], 403);
             }
 
@@ -432,7 +444,9 @@ class PurchaseReturController extends Controller
 
                 $remainingToRestore = $returnQuantityInEceran;
                 foreach ($purchaseDetails as $purchaseDetail) {
-                    if ($remainingToRestore <= 0) break;
+                    if ($remainingToRestore <= 0) {
+                        break;
+                    }
 
                     $purchaseDetailEceran = $this->convertToEceran($purchaseDetail->quantity, $purchaseDetail->unit_id, $product);
                     if ($purchaseDetailEceran > 0) {
@@ -478,17 +492,17 @@ class PurchaseReturController extends Controller
                     'price' => $detail->price,
                     'for' => 'MASUK',
                     'type' => 'HAPUS RETUR PEMBELIAN',
-                    'description' => 'Hapus Retur Pembelian ' . $purchase->order_number,
+                    'description' => 'Hapus Retur Pembelian '.$purchase->order_number,
                 ]);
             }
 
             // Remove cashflow entries related to this return
-            Cashflow::where('description', 'LIKE', '%Retur Pembelian ' . $purchaseRetur->purchase->order_number . '%')
+            Cashflow::where('description', 'LIKE', '%Retur Pembelian '.$purchaseRetur->purchase->order_number.'%')
                 ->where('warehouse_id', $purchaseRetur->warehouse_id)
                 ->delete();
 
             // Remove product reports related to this return
-            ProductReport::where('description', 'LIKE', '%Retur Pembelian ' . $purchaseRetur->purchase->order_number . '%')
+            ProductReport::where('description', 'LIKE', '%Retur Pembelian '.$purchaseRetur->purchase->order_number.'%')
                 ->where('warehouse_id', $purchaseRetur->warehouse_id)
                 ->delete();
 
@@ -502,14 +516,14 @@ class PurchaseReturController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Return berhasil dihapus'
+                'message' => 'Return berhasil dihapus',
             ]);
         } catch (\Exception $e) {
             DB::rollback();
 
             return response()->json([
                 'error' => true,
-                'message' => 'Gagal menghapus return: ' . $e->getMessage()
+                'message' => 'Gagal menghapus return: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -529,7 +543,7 @@ class PurchaseReturController extends Controller
 
                 // Ambil data produk
                 $product = Product::find($productId);
-                if (!$product) {
+                if (! $product) {
                     return response()->json([
                         'errors' => ['Product not found'],
                     ], 422);
@@ -548,22 +562,24 @@ class PurchaseReturController extends Controller
                 // Validasi tidak boleh melebihi sisa qty
                 if ($returnQuantityInEceran > $availableForReturnEceran) {
                     $availableInRequestedUnit = $this->convertFromEceran($availableForReturnEceran, $unitId, $product);
+
                     return response()->json([
                         'errors' => [
-                            'Jumlah retur (' . $quantityRetur . ') melebihi jumlah yang tersedia untuk dikembalikan (' .
-                                number_format($availableInRequestedUnit, 2) . ' dalam unit yang diminta)'
+                            'Jumlah retur ('.$quantityRetur.') melebihi jumlah yang tersedia untuk dikembalikan ('.
+                                number_format($availableInRequestedUnit, 2).' dalam unit yang diminta)',
                         ],
                     ], 422);
                 }
 
-                // Validasi basic
+                // Validasi basic (allow up to 2 decimal places)
                 $rules = [
-                    'quantity' => 'required|numeric|min:1',
+                    'quantity' => 'required|numeric|decimal:0,2|min:0.01',
                 ];
                 $message = [
                     'quantity.required' => 'Jumlah retur harus diisi',
                     'quantity.numeric' => 'Jumlah retur harus berupa angka',
-                    'quantity.min' => 'Jumlah retur minimal 1',
+                    'quantity.decimal' => 'Jumlah retur maksimal 2 angka di belakang koma',
+                    'quantity.min' => 'Jumlah retur minimal 0,01',
                 ];
                 $validator = Validator::make(['quantity' => $quantityRetur], $rules, $message);
                 if ($validator->fails()) {
@@ -571,6 +587,8 @@ class PurchaseReturController extends Controller
                         'errors' => $validator->errors()->all(),
                     ], 422);
                 }
+
+                $quantityRetur = round((float) $quantityRetur, 2);
 
                 // Ambil harga dari detail pembelian yang sesuai, konversi jika perlu
                 $purchaseDetailDus = PurchaseDetail::where('purchase_id', $purchaseId)
@@ -620,7 +638,7 @@ class PurchaseReturController extends Controller
                     ->first();
 
                 if ($existingCart) {
-                    $existingCart->quantity += $quantityRetur;
+                    $existingCart->quantity = round((float) $existingCart->quantity + $quantityRetur, 2);
                     $existingCart->save();
                 } else {
                     PurchaseReturCart::create([
@@ -634,6 +652,7 @@ class PurchaseReturController extends Controller
                 }
             }
         }
+
         return redirect()->back()->with('success', 'Berhasil menambahkan retur ke keranjang');
     }
 
@@ -648,12 +667,12 @@ class PurchaseReturController extends Controller
     public function updateCartQuantity(Request $request, $id)
     {
         $request->validate([
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'required|numeric|decimal:0,2|min:0.01',
         ]);
 
         $returCart = PurchaseReturCart::findOrFail($id);
         $product = Product::find($returCart->product_id);
-        $newQuantity = $request->quantity;
+        $newQuantity = round((float) $request->quantity, 2);
 
         // Convert new quantity to eceran for validation
         $newQuantityInEceran = $this->convertToEceran($newQuantity, $returCart->unit_id, $product);
@@ -661,7 +680,7 @@ class PurchaseReturController extends Controller
         // Calculate available return quantities
         $totalRemainingEceran = $this->getTotalRemainingQuantityInEceran($returCart->purchase_id, $returCart->product_id);
         $totalReturnedEceran = $this->getTotalReturnedQuantityInEceran(auth()->id(), $returCart->purchase_id, $returCart->product_id);
-        
+
         // Add back the old quantity before checking (since it's currently in cart)
         $oldQuantityInEceran = $this->convertToEceran($returCart->quantity, $returCart->unit_id, $product);
         $availableForReturnEceran = $totalRemainingEceran - $totalReturnedEceran + $oldQuantityInEceran;
@@ -669,9 +688,10 @@ class PurchaseReturController extends Controller
         // Validate new quantity doesn't exceed available
         if ($newQuantityInEceran > $availableForReturnEceran) {
             $availableInRequestedUnit = $this->convertFromEceran($availableForReturnEceran, $returCart->unit_id, $product);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Jumlah melebihi yang tersedia untuk dikembalikan (' . number_format($availableInRequestedUnit, 2) . ')'
+                'message' => 'Jumlah melebihi yang tersedia untuk dikembalikan ('.number_format($availableInRequestedUnit, 2).')',
             ], 400);
         }
 
@@ -683,9 +703,9 @@ class PurchaseReturController extends Controller
             'success' => true,
             'message' => 'Quantity updated successfully',
             'data' => [
-                'quantity' => $returCart->quantity,
-                'subtotal' => $returCart->price * $returCart->quantity
-            ]
+                'quantity' => round((float) $returCart->quantity, 2),
+                'subtotal' => round($returCart->price * $returCart->quantity, 2),
+            ],
         ]);
     }
 
@@ -693,7 +713,7 @@ class PurchaseReturController extends Controller
     {
         $purchaseRetur = PurchaseRetur::with('purchase.supplier', 'purchase.details', 'warehouse', 'details', 'user')->findOrFail($id);
         $purchaseReturDetail = PurchaseReturDetail::with('product', 'unit')->where('purchase_retur_id', $id)->get();
-        $returNumber = "PBR-" . date('Ymd') . "-" . str_pad(PurchaseRetur::count() + 1, 4, '0', STR_PAD_LEFT);
+        $returNumber = 'PBR-'.date('Ymd').'-'.str_pad(PurchaseRetur::count() + 1, 4, '0', STR_PAD_LEFT);
         $totalQuantity = $purchaseReturDetail->count();
         $totalPrice = 0;
 
@@ -702,11 +722,12 @@ class PurchaseReturController extends Controller
         }
 
         $pdf = Pdf::loadView('pages.PurchaseRetur.print-retur', compact('purchaseRetur', 'purchaseReturDetail', 'totalQuantity', 'returNumber', 'totalPrice'));
+
         return response()->stream(function () use ($pdf) {
             echo $pdf->output();
         }, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="Retur-Pembelian-' . $purchaseRetur->purchase->order_number . '.pdf"'
+            'Content-Disposition' => 'inline; filename="Retur-Pembelian-'.$purchaseRetur->purchase->order_number.'.pdf"',
         ]);
     }
 
@@ -727,6 +748,7 @@ class PurchaseReturController extends Controller
         } elseif ($unitId == $product->unit_eceran) {
             return $quantity;
         }
+
         return 0;
     }
 
@@ -742,6 +764,7 @@ class PurchaseReturController extends Controller
         } elseif ($unitId == $product->unit_eceran) {
             return $quantityEceran;
         }
+
         return 0;
     }
 
@@ -802,7 +825,7 @@ class PurchaseReturController extends Controller
         $userId = auth()->id();
         $product = Product::find($productId);
 
-        if (!$product) {
+        if (! $product) {
             return response()->json(['error' => 'Product not found'], 404);
         }
 
@@ -817,15 +840,15 @@ class PurchaseReturController extends Controller
             'eceran' => [
                 'unit_id' => $product->unit_eceran,
                 'quantity' => $availableForReturnEceran,
-                'unit_name' => $product->unit_eceran ? Unit::find($product->unit_eceran)->name : null
-            ]
+                'unit_name' => $product->unit_eceran ? Unit::find($product->unit_eceran)->name : null,
+            ],
         ];
 
         if ($product->pak_to_eceran > 0) {
             $availableUnits['pak'] = [
                 'unit_id' => $product->unit_pak,
                 'quantity' => $this->convertFromEceran($availableForReturnEceran, $product->unit_pak, $product),
-                'unit_name' => $product->unit_pak ? Unit::find($product->unit_pak)->name : null
+                'unit_name' => $product->unit_pak ? Unit::find($product->unit_pak)->name : null,
             ];
         }
 
@@ -833,7 +856,7 @@ class PurchaseReturController extends Controller
             $availableUnits['dus'] = [
                 'unit_id' => $product->unit_dus,
                 'quantity' => $this->convertFromEceran($availableForReturnEceran, $product->unit_dus, $product),
-                'unit_name' => $product->unit_dus ? Unit::find($product->unit_dus)->name : null
+                'unit_name' => $product->unit_dus ? Unit::find($product->unit_dus)->name : null,
             ];
         }
 
@@ -842,7 +865,7 @@ class PurchaseReturController extends Controller
             'total_remaining_eceran' => $totalRemainingEceran,
             'total_returned_eceran' => $totalReturnedEceran,
             'available_for_return_eceran' => $availableForReturnEceran,
-            'available_units' => $availableUnits
+            'available_units' => $availableUnits,
         ]);
     }
 }

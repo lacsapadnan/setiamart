@@ -467,7 +467,37 @@
             // Don't call calculateTotal here since handleSplitPaymentInput will call it
         });
 
+        function validateAndSetPaymentMethod() {
+            const paymentMethodSelect = document.getElementsByName('payment_method')[0];
+            const cash = parseFloat(document.getElementById('cash').value.replace(/[.,]/g, '')) || 0;
+            const transfer = parseFloat(document.getElementById('transfer').value.replace(/[.,]/g, '')) || 0;
+            const bayar = parseFloat(document.getElementById('bayar').value.replace(/[.,]/g, '')) || 0;
+
+            if (!paymentMethodSelect.value) {
+                if (cash > 0 && transfer > 0) {
+                    paymentMethodSelect.value = 'split';
+                } else if (cash > 0) {
+                    paymentMethodSelect.value = 'cash';
+                } else if (transfer > 0) {
+                    paymentMethodSelect.value = 'transfer';
+                } else if (bayar > 0) {
+                    const transferDiv = document.getElementById('transferDiv');
+                    const cashDiv = document.getElementById('cashDiv');
+
+                    if (transferDiv.style.display !== 'none') {
+                        paymentMethodSelect.value = 'transfer';
+                    } else if (cashDiv.style.display !== 'none') {
+                        paymentMethodSelect.value = 'cash';
+                    }
+                }
+            }
+
+            return true;
+        }
+
         function submitForms() {
+            validateAndSetPaymentMethod();
+
             // Copy values from form1 to form2 hidden inputs
             document.getElementById('transaction_date_form2').value = document.getElementById(
                 'kt_td_picker_date_only_input').value;
@@ -527,6 +557,8 @@
         }
 
         function draftForms() {
+            validateAndSetPaymentMethod();
+
             // Copy values from form1 to form2 hidden inputs
             document.getElementById('transaction_date_form2').value = document.getElementById(
                 'kt_td_picker_date_only_input').value;

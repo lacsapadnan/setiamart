@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -12,6 +12,19 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('settlements')) {
+            return;
+        }
+
+        // Original create migration used typo `total_recieved`; rename before touching `total_received`.
+        if (Schema::hasColumn('settlements', 'total_recieved') && ! Schema::hasColumn('settlements', 'total_received')) {
+            DB::statement('ALTER TABLE settlements CHANGE total_recieved total_received VARCHAR(255) NULL');
+        }
+
+        if (! Schema::hasColumn('settlements', 'total_received')) {
+            return;
+        }
+
         // First, clean up any invalid data
         DB::statement("UPDATE settlements SET total_received = '0' WHERE total_received IS NULL OR total_received = '' OR total_received = 'null'");
         DB::statement("UPDATE settlements SET outstanding = '0' WHERE outstanding IS NULL OR outstanding = '' OR outstanding = 'null'");

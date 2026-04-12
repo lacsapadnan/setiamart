@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Cashflow;
 use Illuminate\Support\Facades\Auth;
+use InvalidArgumentException;
 
 class CashflowService
 {
@@ -34,7 +35,10 @@ class CashflowService
     ): void {
         $description = "Penjualan {$orderNumber} Customer {$customerName}";
 
-        switch ($paymentMethod) {
+        $method = strtolower(trim($paymentMethod));
+        $hasPaymentAmount = $cash > 0 || $transfer > 0;
+
+        switch ($method) {
             case 'transfer':
                 if ($transfer > 0) {
                     $this->createTransferPaymentFlow($warehouseId, $description, $transfer - $change);
@@ -57,6 +61,14 @@ class CashflowService
             case 'split':
                 if ($cash > 0 && $transfer > 0) {
                     $this->handleSplitPayment($warehouseId, $orderNumber, $customerName, $cash, $transfer, $change);
+                }
+                break;
+
+            default:
+                if ($hasPaymentAmount) {
+                    throw new InvalidArgumentException(
+                        "Metode pembayaran penjualan tidak dikenal: \"{$paymentMethod}\" (order {$orderNumber})."
+                    );
                 }
                 break;
         }
@@ -189,7 +201,6 @@ class CashflowService
         float $transfer = 0,
         float $grandTotal = 0
     ): void {
-
 
         $description = "Pembelian {$orderNumber} Supplier {$supplierName}";
 

@@ -1,9 +1,8 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -12,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (! Schema::hasTable('attendances')) {
+            return;
+        }
+
         // Update any existing 'on_break' status to 'checked_in'
         DB::table('attendances')
             ->where('status', 'on_break')
@@ -26,6 +29,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (! Schema::hasTable('attendances')) {
+            return;
+        }
+
         // Add back the 'on_break' option to the enum
         DB::statement("ALTER TABLE attendances MODIFY COLUMN status ENUM('checked_in', 'checked_out', 'on_break') NOT NULL DEFAULT 'checked_in'");
     }

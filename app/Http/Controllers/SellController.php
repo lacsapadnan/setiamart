@@ -17,6 +17,7 @@ use App\Models\Unit;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\CashflowService;
+use App\Support\SalePaymentMethodResolver;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use DataTables;
@@ -24,6 +25,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Response;
+use InvalidArgumentException;
 use Maatwebsite\Excel\Facades\Excel;
 use Mike42\Escpos\EscposImage;
 use Mike42\Escpos\PrintConnectors\FilePrintConnector;
@@ -221,16 +223,15 @@ class SellController extends Controller
         try {
             DB::beginTransaction();
 
-            // Determine payment method if not provided
-            $paymentMethod = $request->payment_method;
-            if (empty($paymentMethod)) {
-                if ($cash > 0 && $transfer > 0) {
-                    $paymentMethod = 'split';
-                } elseif ($cash > 0) {
-                    $paymentMethod = 'cash';
-                } elseif ($transfer > 0) {
-                    $paymentMethod = 'transfer';
-                }
+            $rawPaymentMethod = $request->input('payment_method');
+            $paymentMethod = SalePaymentMethodResolver::resolve(
+                is_string($rawPaymentMethod) ? $rawPaymentMethod : null,
+                $cash,
+                $transfer
+            );
+
+            if ($request->status !== 'draft' && $pay > 0 && $paymentMethod === null) {
+                throw new InvalidArgumentException('Metode pembayaran tidak dapat ditentukan untuk jurnal kas.');
             }
 
             $sell = Sell::create([
@@ -325,20 +326,16 @@ class SellController extends Controller
                 // Bulk insert product reports
                 ProductReport::insert($productReportsData);
 
-                // Only create cashflow if there's actual payment
                 if ($pay > 0) {
-                    // Use the determined payment method (should never be empty now)
-                    if ($paymentMethod) {
-                        $this->cashflowService->handleSalePayment(
-                            warehouseId: auth()->user()->warehouse_id,
-                            orderNumber: $sell->order_number,
-                            customerName: $customer->name,
-                            paymentMethod: $paymentMethod,
-                            cash: $cash,
-                            transfer: $transfer,
-                            change: $sell->change
-                        );
-                    }
+                    $this->cashflowService->handleSalePayment(
+                        warehouseId: auth()->user()->warehouse_id,
+                        orderNumber: $sell->order_number,
+                        customerName: $customer->name,
+                        paymentMethod: $paymentMethod,
+                        cash: $cash,
+                        transfer: $transfer,
+                        change: $sell->change
+                    );
                 }
 
                 // Move cart deletion to end of transaction

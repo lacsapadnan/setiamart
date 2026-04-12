@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cashflow;
 use App\Models\Customer;
 use App\Models\Inventory;
 use App\Models\Product;
@@ -13,9 +12,11 @@ use App\Models\SellDetail;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\CashflowService;
+use App\Support\SalePaymentMethodResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
+use InvalidArgumentException;
 
 class SellDraftController extends Controller
 {
@@ -101,13 +102,13 @@ class SellDraftController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        $sell = Sell::where('id', $id)->first();
+        $sell = Sell::where('id', $id)->firstOrFail();
         $sellCart = SellCartDraft::where('sell_id', $id)
             ->get();
 
-        $transfer = str_replace(',', '', $request->transfer ?? 0);
-        $cash = str_replace(',', '', $request->cash ?? 0);
-        $change = str_replace('.', '', $request->change ?? 0);
+        $transfer = (int) str_replace(',', '', $request->transfer ?? 0);
+        $cash = (int) str_replace(',', '', $request->cash ?? 0);
+        $change = (int) preg_replace('/[,.]/', '', $request->change ?? 0);
 
         $pay = $transfer + $cash;
 
@@ -119,52 +120,34 @@ class SellDraftController extends Controller
             $status = 'lunas';
         }
 
-        // Generate new order number if status is not draft and cashier changed
-        if ($status !== 'draft' && $sell->cashier_id !== auth()->id()) {
-            $today = date('Ymd');
-            $today = substr($today, 2);
-            $warehouseId = auth()->user()->warehouse_id;
-            $userId = auth()->id();
-
-            $lastOrder = Sell::where('cashier_id', $userId)
-                ->where('warehouse_id', $warehouseId)
-                ->whereDate('created_at', now())
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            if ($lastOrder) {
-                $lastOrderNumberPart = explode('-', $lastOrder->order_number);
-                $lastOrderNumber = intval(end($lastOrderNumberPart));
-                $newOrderNumber = $lastOrderNumber + 1;
-            } else {
-                $newOrderNumber = 1;
-            }
-
-            $formattedOrderNumber = str_pad($newOrderNumber, 4, '0', STR_PAD_LEFT);
-            $sell->order_number = 'PJ-'.$today.'-'.$warehouseId.$userId.'-'.$formattedOrderNumber;
-        }
-
-        $sell->status = $status;
-        $sell->customer_id = $request->customer;
-        $sell->grand_total = preg_replace('/[,.]/', '', $request->grand_total);
-        $sell->pay = $pay;
-        $sell->cash = $cash ?? 0;
-        $sell->transfer = $transfer ?? 0;
-        $sell->change = $change ?? 0;
-        $sell->payment_method = $request->payment_method ?? null;
-        $sell->cashier_id = auth()->id();
-        $sell->update();
+        $rawPaymentMethod = $request->input('payment_method');
+        $paymentMethod = SalePaymentMethodResolver::resolve(
+            is_string($rawPaymentMethod) ? $rawPaymentMethod : null,
+            $cash,
+            $transfer
+        );
 
         if ($request->status == 'draft') {
+            $sell->status = $status;
+            $sell->customer_id = $request->customer;
+            $sell->grand_total = preg_replace('/[,.]/', '', $request->grand_total);
+            $sell->pay = $pay;
+            $sell->cash = $cash;
+            $sell->transfer = $transfer;
+            $sell->change = $change;
+            $sell->payment_method = $paymentMethod;
+            $sell->cashier_id = auth()->id();
+            $sell->update();
+
             foreach ($sellCart as $sc) {
-                $sellCart = SellCartDraft::where('sell_id', $id)
+                $draftRow = SellCartDraft::where('sell_id', $id)
                     ->where('product_id', $sc->product_id)
                     ->where('unit_id', $sc->unit_id)
                     ->first();
 
-                if ($sellCart) {
-                    $sellCart->quantity = $sc->quantity;
-                    $sellCart->save();
+                if ($draftRow) {
+                    $draftRow->quantity = $sc->quantity;
+                    $draftRow->save();
                 } else {
                     SellCartDraft::create([
                         'cashier_id' => $request->cashier_id,
@@ -181,7 +164,50 @@ class SellDraftController extends Controller
             return redirect()
                 ->route('penjualan-draft.index')
                 ->with('success', 'penjualan berhasil diubah');
-        } else {
+        }
+
+        try {
+            DB::beginTransaction();
+
+            if ($status !== 'draft' && $sell->cashier_id !== auth()->id()) {
+                $today = date('Ymd');
+                $today = substr($today, 2);
+                $warehouseId = auth()->user()->warehouse_id;
+                $userId = auth()->id();
+
+                $lastOrder = Sell::where('cashier_id', $userId)
+                    ->where('warehouse_id', $warehouseId)
+                    ->whereDate('created_at', now())
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                if ($lastOrder) {
+                    $lastOrderNumberPart = explode('-', $lastOrder->order_number);
+                    $lastOrderNumber = intval(end($lastOrderNumberPart));
+                    $newOrderNumber = $lastOrderNumber + 1;
+                } else {
+                    $newOrderNumber = 1;
+                }
+
+                $formattedOrderNumber = str_pad($newOrderNumber, 4, '0', STR_PAD_LEFT);
+                $sell->order_number = 'PJ-'.$today.'-'.$warehouseId.$userId.'-'.$formattedOrderNumber;
+            }
+
+            if ($pay > 0 && $paymentMethod === null) {
+                throw new InvalidArgumentException('Metode pembayaran tidak dapat ditentukan untuk jurnal kas.');
+            }
+
+            $sell->status = $status;
+            $sell->customer_id = $request->customer;
+            $sell->grand_total = preg_replace('/[,.]/', '', $request->grand_total);
+            $sell->pay = $pay;
+            $sell->cash = $cash;
+            $sell->transfer = $transfer;
+            $sell->change = $change;
+            $sell->payment_method = $paymentMethod;
+            $sell->cashier_id = auth()->id();
+            $sell->save();
+
             foreach ($sellCart as $sc) {
                 SellDetail::create([
                     'sell_id' => $sell->id,
@@ -220,44 +246,44 @@ class SellDraftController extends Controller
 
             $sellCart->each->delete();
 
-            // Only handle cashflow if it's not a credit sale (piutang)
-            if ($status !== 'piutang' && $request->payment_method) {
-                // Get customer name for the cashflow record
+            if ($pay > 0) {
                 $customer = Customer::find($request->customer);
                 $customerName = $customer ? $customer->name : '';
 
-                // Handle cashflow using service
-                $cashflowService = app(CashflowService::class);
-                $cashflowService->handleSalePayment(
+                $this->cashflowService->handleSalePayment(
                     warehouseId: auth()->user()->warehouse_id,
-                    orderNumber: $request->order_number,
+                    orderNumber: $sell->order_number,
                     customerName: $customerName,
-                    paymentMethod: $request->payment_method,
-                    cash: $cash,
-                    transfer: $transfer,
-                    change: $sell->change
+                    paymentMethod: $paymentMethod,
+                    cash: (float) $cash,
+                    transfer: (float) $transfer,
+                    change: (float) $sell->change,
                 );
             }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            report($e);
+
+            return redirect()->back()
+                ->withInput()
+                ->withErrors('Terjadi kesalahan saat menyimpan transaksi.');
         }
 
-        if ($request->status != 'draft') {
-            try {
-                // Add a small delay to ensure database operations are fully committed
-                sleep(1);
+        try {
+            sleep(1);
 
-                $printUrl = route('penjualan.print', $sell->id);
-                $script = "<script>
-                    setTimeout(function() {
-                        window.open('$printUrl', '_blank');
-                    }, 500);
-                </script>";
+            $printUrl = route('penjualan.print', $sell->id);
+            $script = "<script>
+                setTimeout(function() {
+                    window.open('$printUrl', '_blank');
+                }, 500);
+            </script>";
 
-                return Response::make($script.'<script>setTimeout(function() { window.location.href = "'.route('penjualan.index').'"; }, 1000);</script>');
-            } catch (\Throwable $th) {
-                return redirect()->route('penjualan.index')->withErrors('Transaksi berhasil disimpan, tetapi gagal mencetak struk');
-            }
-        } else {
-            return redirect()->route('penjualan-draft.index')->with('success', 'Penjualan draft berhasil diubah');
+            return Response::make($script.'<script>setTimeout(function() { window.location.href = "'.route('penjualan.index').'"; }, 1000);</script>');
+        } catch (\Throwable $th) {
+            return redirect()->route('penjualan.index')->withErrors('Transaksi berhasil disimpan, tetapi gagal mencetak struk');
         }
     }
 
