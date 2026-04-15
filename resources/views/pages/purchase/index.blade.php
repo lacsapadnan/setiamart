@@ -80,6 +80,11 @@
                 Tambah Pembelian
             </a>
             @endcan
+            @canany(['baca pembelian', 'simpan pembelian', 'baca draft'])
+            <a href="{{ route('pembelian-draft.index') }}" type="button" class="btn btn-light-primary">
+                Draft Pembelian
+            </a>
+            @endcanany
             <!--begin::Menu-->
             <div id="kt_datatable_example_export_menu"
                 class="py-4 menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-semibold fs-7 w-200px"

@@ -169,7 +169,7 @@
                                         <button type="button" class="btn btn-sm btn-light-primary btn-icon qty-decrease" data-cart-id="{{ $cart->id }}">
                                             <i class="bi bi-dash"></i>
                                         </button>
-                                        <input type="number" class="form-control form-control-sm text-center qty-input" value="{{ $cart->quantity }}" readonly style="width: 60px;">
+                                        <input type="number" class="form-control form-control-sm text-center qty-input" value="{{ $cart->quantity }}" step="0.01" min="0.01" style="width: 60px;">
                                         <button type="button" class="btn btn-sm btn-light-primary btn-icon qty-increase" data-cart-id="{{ $cart->id }}">
                                             <i class="bi bi-plus"></i>
                                         </button>
@@ -979,57 +979,91 @@
         });
 
         // Cart quantity update handlers
-        $(document).on('click', '.qty-increase, .qty-decrease', function() {
-            const button = $(this);
-            const cartId = button.data('cart-id');
-            const row = $(`tr[data-cart-id="${cartId}"]`);
+        function updateCartQuantity(row, newQty, oldQty) {
+            const cartId = row.data('cart-id');
             const input = row.find('.qty-input');
-            const currentQty = parseInt(input.val());
-            const isIncrease = button.hasClass('qty-increase');
-            const newQty = isIncrease ? currentQty + 1 : Math.max(1, currentQty - 1);
+            const controls = row.find('.qty-increase, .qty-decrease, .qty-input');
+            const normalizedQty = Number(newQty);
+            const fallbackQty = Number(oldQty);
 
-            if (newQty === currentQty) return;
+            if (!Number.isFinite(normalizedQty) || normalizedQty < 0.01) {
+                input.val(fallbackQty);
+                toastr.error('Quantity minimal 0.01');
+                return;
+            }
 
-            button.prop('disabled', true);
-            row.find('.qty-increase, .qty-decrease').prop('disabled', true);
+            if (normalizedQty === fallbackQty) {
+                return;
+            }
+
+            controls.prop('disabled', true);
 
             $.ajax({
                 url: `/penjualan-draft/cart/${cartId}/quantity`,
                 method: 'PATCH',
                 data: {
-                    quantity: newQty,
+                    quantity: normalizedQty,
                     _token: '{{ csrf_token() }}'
                 },
                 success: function(response) {
                     if (response.success) {
                         input.val(response.data.quantity);
                         row.find('.cart-subtotal').text(new Intl.NumberFormat('id-ID').format(response.data.subtotal));
-                        
+
                         // Recalculate subtotal from all cart items
                         let subtotal = 0;
                         $('tr[data-cart-id]').each(function() {
                             const subtotalText = $(this).find('.cart-subtotal').text().replace(/[.,]/g, '');
                             subtotal += parseInt(subtotalText) || 0;
                         });
-                        
-                        // Update subtotal field
+
                         $('#subtotal').val(new Intl.NumberFormat('id-ID').format(subtotal));
-                        
-                        // Call calculateTotal to update grand total and other fields
                         calculateTotal();
-                        
                         toastr.success('Quantity updated successfully');
                     }
                 },
                 error: function(xhr) {
                     const message = xhr.responseJSON?.message || 'Failed to update quantity';
                     toastr.error(message);
-                    input.val(currentQty);
+                    input.val(fallbackQty);
                 },
                 complete: function() {
-                    row.find('.qty-increase, .qty-decrease').prop('disabled', false);
+                    controls.prop('disabled', false);
                 }
             });
+        }
+
+        $(document).on('click', '.qty-increase, .qty-decrease', function() {
+            const button = $(this);
+            const cartId = button.data('cart-id');
+            const row = $(`tr[data-cart-id="${cartId}"]`);
+            const input = row.find('.qty-input');
+            const currentQty = parseFloat(String(input.val()).replace(',', '.')) || 0.01;
+            const isIncrease = button.hasClass('qty-increase');
+            const newQty = isIncrease ? currentQty + 1 : Math.max(0.01, currentQty - 1);
+
+            updateCartQuantity(row, newQty, currentQty);
+        });
+
+        $(document).on('focus', '.qty-input', function() {
+            $(this).data('last-value', parseFloat(String($(this).val()).replace(',', '.')) || 0.01);
+        });
+
+        $(document).on('keydown', '.qty-input', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                $(this).trigger('change');
+            }
+        });
+
+        $(document).on('change', '.qty-input', function() {
+            const input = $(this);
+            const row = input.closest('tr[data-cart-id]');
+            const previousQty = Number(input.data('last-value')) || 0.01;
+            const enteredQty = parseFloat(String(input.val()).replace(',', '.'));
+            const newQty = Math.max(0.01, Number.isFinite(enteredQty) ? enteredQty : previousQty);
+
+            updateCartQuantity(row, newQty, previousQty);
         });
 
         // Class definition

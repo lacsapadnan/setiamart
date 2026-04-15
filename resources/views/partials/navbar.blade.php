@@ -295,6 +295,13 @@
                         </div>
                         <!--end:Menu item-->
                         @endcan
+                        @canany(['baca pembelian', 'simpan pembelian', 'baca draft'])
+                        <div class="menu-item {{ request()->routeIs('pembelian-draft.*') ? ' here' : '' }}">
+                            <a class="menu-link" href="{{ route('pembelian-draft.index') }}">
+                                <span class="menu-title">Draft Pembelian</span>
+                            </a>
+                        </div>
+                        @endcanany
                         @can('baca retur')
                         <!--begin:Menu item-->
                         <div class="menu-item {{ request()->routeIs('pembelian-retur.*') ? ' here' : '' }}">

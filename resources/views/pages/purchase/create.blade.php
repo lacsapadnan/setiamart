@@ -34,6 +34,9 @@
 
 @section('content')
 @include('components.alert')
+@php
+    $isDraftMode = isset($purchase) && $purchase->status === 'draft';
+@endphp
 <div class="mt-5 border-0 card card-p-0 card-flush">
     <div class="mt-3">
         <form id="form1">
@@ -44,7 +47,7 @@
                         <div class="input-group" id="kt_td_picker_date_only" data-td-target-input="nearest"
                             data-td-target-toggle="nearest">
                             <input id="kt_td_picker_date_only_input" type="text" class="form-control"
-                                data-td-target="#kt_td_picker_date_only" name="reciept_date" value="{{ date('Y-m-d') }}"
+                                data-td-target="#kt_td_picker_date_only" name="reciept_date" value="{{ old('reciept_date', $isDraftMode ? optional($purchase->reciept_date)->format('Y-m-d') : date('Y-m-d')) }}"
                                 disabled />
                             <span class="input-group-text" data-td-target="#kt_td_picker_date_only"
                                 data-td-toggle="datetimepicker">
@@ -65,7 +68,7 @@
                     <div class="mb-3 row align-items-center">
                         <label for="inputEmail3" class="col-form-label">No. Faktur Supplier</label>
                         <input id="invoice" type="text" name="invoice" class="form-control"
-                            placeholder="Masukan nomor faktur" value="{{ old('invoice') }}" />
+                            placeholder="Masukan nomor faktur" value="{{ old('invoice', $isDraftMode ? $purchase->invoice : '') }}" />
                     </div>
                 </div>
                 <div class="col-md-3">
@@ -73,9 +76,9 @@
                         <label for="inputEmail3" class="col-form-label">Supplier</label>
                         <select id="supplier_id" class="form-select" name="supplier_id" data-control="select2"
                             data-placeholder="Pilih Supplier" data-allow-clear="true">
-                            <option value="{{ old('supplier_id') }}"></option>
+                            <option value="{{ old('supplier_id', $isDraftMode ? $purchase->supplier_id : '') }}"></option>
                             @foreach ($suppliers as $supplier)
-                            <option value="{{ $supplier->id }}">{{ $supplier->name }}</option>
+                            <option value="{{ $supplier->id }}" @selected((string) old('supplier_id', $isDraftMode ? $purchase->supplier_id : '') === (string) $supplier->id)>{{ $supplier->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -156,7 +159,7 @@
                                         <button type="button" class="btn btn-sm btn-light-primary btn-icon qty-decrease" data-cart-id="{{ $cart->id }}">
                                             <i class="bi bi-dash"></i>
                                         </button>
-                                        <input type="number" class="form-control form-control-sm text-center qty-input" value="{{ $cart->quantity }}" readonly step="0.01" min="0.01" style="width: 80px;">
+                                        <input type="number" class="form-control form-control-sm text-center qty-input" value="{{ $cart->quantity }}" step="0.01" min="0.01" style="width: 80px;">
                                         <button type="button" class="btn btn-sm btn-light-primary btn-icon qty-increase" data-cart-id="{{ $cart->id }}">
                                             <i class="bi bi-plus"></i>
                                         </button>
@@ -168,7 +171,7 @@
                                     {{ number_format($cart->total_price) }}
                                 </td>
                                 <td>
-                                    <form action="{{ route('pembelian.destroyCart', $cart->id) }}" method="POST">
+                                    <form action="{{ $isDraftMode ? route('pembelian-draft.destroyCart', $cart->id) : route('pembelian.destroyCart', $cart->id) }}" method="POST">
                                         @csrf
                                         @method('delete')
                                         <button class="btn btn-sm btn-danger">
@@ -184,12 +187,16 @@
             </div>
         </div>
         <div class="col-md-4">
-            <form id="form2" action="{{ route('pembelian.store') }}" method="post">
+            <form id="form2" action="{{ $isDraftMode ? route('pembelian-draft.update', $purchase->id) : route('pembelian.store') }}" method="post">
                 @csrf
+                @if ($isDraftMode)
+                    @method('PUT')
+                @endif
                 <input type="hidden" name="reciept_date" id="reciept_date_form2">
                 <input type="hidden" name="invoice" id="invoice_form2">
                 <input type="hidden" name="supplier_id" id="supplier_id_form2">
                 <input type="hidden" name="order_number" id="order_number_form2">
+                <input type="hidden" name="status" id="status_form2">
                 <div class="row">
                     <div class="col">
                         <div class="mb-1">
@@ -201,7 +208,7 @@
                     <div class="col">
                         <div class="mb-1">
                             <label for="ppn" class="col-form-label">PPN</label>
-                            <input type="text" name="tax" class="form-control" id="ppn" value="0"
+                            <input type="text" name="tax" class="form-control" id="ppn" value="{{ old('tax', $isDraftMode ? (int) $purchase->tax : 0) }}"
                                 oninput="calculateTotal()" />
                         </div>
                     </div>
@@ -211,7 +218,7 @@
                         <div class="mb-1">
                             <label for="potongan" class="col-form-label">Potongan</label>
                             <input type="text" name="potongan" class="form-control" id="potongan"
-                                oninput="formatNumber(this); calculateTotal()" value="0" />
+                                oninput="formatNumber(this); calculateTotal()" value="{{ old('potongan', $isDraftMode ? number_format((int) $purchase->potongan, 0, ',', '.') : 0) }}" />
                         </div>
                     </div>
                 </div>
@@ -220,7 +227,7 @@
                 <div class="mb-1" id="bayarDiv">
                     <label for="bayar" class="col-form-label">Bayar</label>
                     <input type="text" name="pay" class="form-control" id="bayar"
-                        oninput="formatNumber(this); calculateTotal()" value="0" />
+                        oninput="formatNumber(this); calculateTotal()" value="{{ old('pay', $isDraftMode ? number_format((int) $purchase->pay, 0, ',', '.') : 0) }}" />
                 </div>
 
                 <div class="mb-1" style="display: none;" id="transferDiv">
@@ -263,21 +270,22 @@
                 <div class="mt-5 row">
                     <div class="mb-1">
                         <label for="inputEmail3" class="col-form-label">Metode Bayar</label>
-                        <select name="payment_method" class="form-select" aria-label="Select example"
+                            <select name="payment_method" class="form-select" aria-label="Select example"
                             onchange="togglePaymentFields()">
                             <option value="">Pilih Pembayaran</option>
-                            <option value="transfer">Transfer</option>
-                            <option value="cash">Cash</option>
-                            <option value="split">Split Payment</option>
+                            <option value="transfer" @selected(old('payment_method', $isDraftMode ? $purchase->payment_method : '') === 'transfer')>Transfer</option>
+                            <option value="cash" @selected(old('payment_method', $isDraftMode ? $purchase->payment_method : '') === 'cash')>Cash</option>
+                            <option value="split" @selected(old('payment_method', $isDraftMode ? $purchase->payment_method : '') === 'split')>Split Payment</option>
                         </select>
                     </div>
                     <div class="mb-1">
                         <label for="inputEmail3" class="col-form-label">Keterangan</label>
-                        <input name="description" type="text" class="form-control" />
+                        <input name="description" type="text" class="form-control" value="{{ old('description', $isDraftMode ? $purchase->description : '') }}" />
                     </div>
                 </div>
                 <div class="mt-5 row">
-                    <button type="submit" onclick="submitForms()" class="btn btn-primary">Simpan</button>
+                    <button type="button" onclick="submitForms()" class="btn btn-primary">Simpan</button>
+                    <button type="button" onclick="draftForms()" class="mt-4 btn btn-danger">Draft</button>
                 </div>
             </form>
         </div>
@@ -293,6 +301,11 @@
 
 {{-- calculated form --}}
 <script>
+    const isDraftMode = @json($isDraftMode);
+    const purchaseDraftId = @json($isDraftMode ? ($purchase->id ?? null) : null);
+    const purchaseAddCartUrl = isDraftMode ? '{{ route('pembelian-draft.addCart') }}' : '{{ route('pembelian.addCart') }}';
+    const purchaseUpdateCartQuantityUrl = isDraftMode ? '/pembelian-draft/cart' : '/pembelian/cart';
+
     function formatNumber(input) {
         // Hapus semua karakter non-digit
         let value = input.value.replace(/\D/g, '');
@@ -513,13 +526,58 @@
         var invoice = $('#invoice').val();
         var supplierId = $('#supplier_id').val();
 
+        if (!supplierId) {
+            Swal.fire({
+                title: 'Gagal',
+                text: 'Supplier wajib dipilih.',
+                icon: 'error',
+                buttonsStyling: false,
+                confirmButtonText: 'Ok, mengerti!',
+                customClass: {
+                    confirmButton: 'btn btn-danger'
+                }
+            });
+            return;
+        }
+
         // Assign the values to the hidden input fields in form2
         $('#reciept_date_form2').val(recieptDate);
         $('#invoice_form2').val(invoice);
         $('#supplier_id_form2').val(supplierId);
         document.getElementById('order_number_form2').value = document.getElementById('order_number').value;
+        document.getElementById('status_form2').value = '';
 
         // Only submit form2, not both forms
+        document.getElementById('form2').submit();
+    }
+
+    function draftForms() {
+        validateAndSetPaymentMethod();
+
+        var recieptDate = $('#kt_td_picker_date_only_input').val();
+        var invoice = $('#invoice').val();
+        var supplierId = $('#supplier_id').val();
+
+        if (!supplierId) {
+            Swal.fire({
+                title: 'Gagal',
+                text: 'Supplier wajib dipilih.',
+                icon: 'error',
+                buttonsStyling: false,
+                confirmButtonText: 'Ok, mengerti!',
+                customClass: {
+                    confirmButton: 'btn btn-danger'
+                }
+            });
+            return;
+        }
+
+        $('#reciept_date_form2').val(recieptDate);
+        $('#invoice_form2').val(invoice);
+        $('#supplier_id_form2').val(supplierId);
+        document.getElementById('order_number_form2').value = document.getElementById('order_number').value;
+        document.getElementById('status_form2').value = 'draft';
+
         document.getElementById('form2').submit();
     }
 </script>
@@ -789,10 +847,11 @@
 
                     // Send AJAX request
                     $.ajax({
-                        url: '{{ route('pembelian.addCart') }}',
+                        url: purchaseAddCartUrl,
                         type: 'POST',
                         data: {
-                            requests: inputRequests // Pass the array of objects as "requests"
+                            requests: inputRequests, // Pass the array of objects as "requests"
+                            purchase_id: purchaseDraftId,
                         },
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -922,61 +981,91 @@
         }
 
         // Cart quantity update handlers
-        $(document).on('click', '.qty-increase, .qty-decrease', function() {
-            const button = $(this);
-            const cartId = button.data('cart-id');
-            const row = $(`tr[data-cart-id="${cartId}"]`);
+        function updateCartQuantity(row, newQty, oldQty) {
+            const cartId = row.data('cart-id');
             const input = row.find('.qty-input');
-            const currentQty = parseFloat(input.val()) || 0;
-            const isIncrease = button.hasClass('qty-increase');
-            const step = 0.01;
-            const minQty = 0.01;
-            const newQty = isIncrease
-                ? Number((currentQty + step).toFixed(2))
-                : Number(Math.max(minQty, currentQty - step).toFixed(2));
+            const controls = row.find('.qty-increase, .qty-decrease, .qty-input');
+            const normalizedQty = Number(newQty);
+            const fallbackQty = Number(oldQty);
 
-            if (newQty === currentQty) return;
+            if (!Number.isFinite(normalizedQty) || normalizedQty < 0.01) {
+                input.val(fallbackQty);
+                toastr.error('Quantity minimal 0.01');
+                return;
+            }
 
-            button.prop('disabled', true);
-            row.find('.qty-increase, .qty-decrease').prop('disabled', true);
+            if (normalizedQty === fallbackQty) {
+                return;
+            }
+
+            controls.prop('disabled', true);
 
             $.ajax({
-                url: `/pembelian/cart/${cartId}/quantity`,
+                url: `${purchaseUpdateCartQuantityUrl}/${cartId}/quantity`,
                 method: 'PATCH',
                 data: {
-                    quantity: newQty,
+                    quantity: normalizedQty,
                     _token: '{{ csrf_token() }}'
                 },
                 success: function(response) {
                     if (response.success) {
                         input.val(response.data.quantity);
                         row.find('.cart-subtotal').text(new Intl.NumberFormat('id-ID').format(response.data.subtotal));
-                        
+
                         // Recalculate subtotal from all cart items
                         let subtotal = 0;
                         $('tr[data-cart-id]').each(function() {
                             const subtotalText = $(this).find('.cart-subtotal').text().replace(/[.,]/g, '');
                             subtotal += parseInt(subtotalText) || 0;
                         });
-                        
-                        // Update subtotal field
+
                         $('#subtotal').val(new Intl.NumberFormat('id-ID').format(subtotal));
-                        
-                        // Call calculateTotal to update grand total with tax and discount
                         calculateTotal();
-                        
                         toastr.success('Quantity updated successfully');
                     }
                 },
                 error: function(xhr) {
                     const message = xhr.responseJSON?.message || 'Failed to update quantity';
                     toastr.error(message);
-                    input.val(currentQty);
+                    input.val(fallbackQty);
                 },
                 complete: function() {
-                    row.find('.qty-increase, .qty-decrease').prop('disabled', false);
+                    controls.prop('disabled', false);
                 }
             });
+        }
+
+        $(document).on('click', '.qty-increase, .qty-decrease', function() {
+            const button = $(this);
+            const cartId = button.data('cart-id');
+            const row = $(`tr[data-cart-id="${cartId}"]`);
+            const input = row.find('.qty-input');
+            const currentQty = parseFloat(String(input.val()).replace(',', '.')) || 0.01;
+            const isIncrease = button.hasClass('qty-increase');
+            const newQty = isIncrease ? currentQty + 1 : Math.max(0.01, currentQty - 1);
+
+            updateCartQuantity(row, newQty, currentQty);
+        });
+
+        $(document).on('focus', '.qty-input', function() {
+            $(this).data('last-value', parseFloat(String($(this).val()).replace(',', '.')) || 0.01);
+        });
+
+        $(document).on('keydown', '.qty-input', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                $(this).trigger('change');
+            }
+        });
+
+        $(document).on('change', '.qty-input', function() {
+            const input = $(this);
+            const row = input.closest('tr[data-cart-id]');
+            const previousQty = Number(input.data('last-value')) || 0.01;
+            const enteredQty = parseFloat(String(input.val()).replace(',', '.'));
+            const newQty = Math.max(0.01, Number.isFinite(enteredQty) ? enteredQty : previousQty);
+
+            updateCartQuantity(row, newQty, previousQty);
         });
 </script>
 @endpush

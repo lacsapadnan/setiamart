@@ -20,6 +20,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductReportController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PurchaseController;
+use App\Http\Controllers\PurchaseDraftController;
 use App\Http\Controllers\PurchaseReturController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RolePermissionController;
@@ -69,6 +70,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::resource('inventori', InventoryController::class);
     Route::resource('penjualan', SellController::class);
     Route::resource('pembelian', PurchaseController::class);
+    Route::resource('pembelian-draft', PurchaseDraftController::class);
     Route::resource('role-permission', RolePermissionController::class)->except(['show', 'create']);
     Route::resource('karyawan', EmployeeController::class)->except(['show', 'create']);
     Route::post('karyawan/{id}/toggle-active', [EmployeeController::class, 'toggleActive'])->name('karyawan.toggle-active');
@@ -174,6 +176,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::get('settlement/api/data', [SettlementController::class, 'data'])->name('api.settlement');
     Route::get('combined-data/api/data', [SettlementController::class, 'combinedData'])->name('api.combined-data');
     Route::get('penjualan-draft/api/data', [SellDraftController::class, 'data'])->name('api.penjualan-draft');
+    Route::get('pembelian-draft/api/data', [PurchaseDraftController::class, 'data'])->name('api.pembelian-draft');
     Route::get('report/api/data', [ReportController::class, 'data'])->name('api.report');
     Route::get('report/api/live-data', [ReportController::class, 'liveData'])->name('api.report.live');
     Route::get('report/api/summary', [ReportController::class, 'summary'])->name('api.report.summary');
@@ -212,9 +215,11 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('pindah-stok/cart', [SendStockController::class, 'addCart'])->name('pindah-stok.addCart');
     Route::post('pindah-stok-draft/cart', [SendStockDraftController::class, 'addCart'])->name('pindah-stok-draft.addCart');
     Route::post('penjualan-draft/cart', [SellDraftController::class, 'addCart'])->name('penjualan-draft.addCart');
+    Route::post('pembelian-draft/cart', [PurchaseDraftController::class, 'addCart'])->name('pembelian-draft.addCart');
     Route::patch('penjualan/cart/{id}/quantity', [SellController::class, 'updateCartQuantity'])->name('penjualan.updateCartQuantity');
     Route::patch('pembelian/cart/{id}/quantity', [PurchaseController::class, 'updateCartQuantity'])->name('pembelian.updateCartQuantity');
     Route::patch('penjualan-draft/cart/{id}/quantity', [SellDraftController::class, 'updateCartQuantity'])->name('penjualan-draft.updateCartQuantity');
+    Route::patch('pembelian-draft/cart/{id}/quantity', [PurchaseDraftController::class, 'updateCartQuantity'])->name('pembelian-draft.updateCartQuantity');
     Route::patch('pindah-stok/cart/{id}/quantity', [SendStockController::class, 'updateCartQuantity'])->name('pindah-stok.updateCartQuantity');
     Route::patch('pindah-stok-draft/cart/{id}/quantity', [SendStockDraftController::class, 'updateCartQuantity'])->name('pindah-stok-draft.updateCartQuantity');
     Route::patch('penjualan-retur/cart/{id}/quantity', [SellReturController::class, 'updateCartQuantity'])->name('penjualan-retur.updateCartQuantity');
@@ -226,6 +231,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::delete('pindah-stok/cart/hapus/{id}', [SendStockController::class, 'destroyCart'])->name('pindah-stok.destroyCart');
     Route::delete('pindah-stok-draft/cart/hapus/{id}', [SendStockDraftController::class, 'destroyCart'])->name('pindah-stok-draft.destroyCart');
     Route::delete('penjualan-draft/cart/hapus/{id}', [SellDraftController::class, 'destroyCart'])->name('penjualan-draft.destroyCart');
+    Route::delete('pembelian-draft/cart/hapus/{id}', [PurchaseDraftController::class, 'destroyCart'])->name('pembelian-draft.destroyCart');
     Route::get('purchase-retur/available-qty/{purchaseId}/{productId}', [PurchaseReturController::class, 'getAvailableReturnQuantities'])->name('purchase-retur.available-qty');
 
     // Print

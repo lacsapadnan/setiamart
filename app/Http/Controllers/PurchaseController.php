@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\ProductReport;
 use App\Models\Purchase;
 use App\Models\PurchaseCart;
+use App\Models\PurchaseCartDraft;
 use App\Models\PurchaseDetail;
 use App\Models\PurchaseRetur;
 use App\Models\PurchaseReturDetail;
@@ -156,8 +157,18 @@ class PurchaseController extends Controller
      */
     public function store(Request $request)
     {
-        try {
+        $request->validate([
+            'supplier_id' => ['required', 'exists:suppliers,id'],
+            'order_number' => ['required', 'string', 'max:255'],
+            'reciept_date' => ['required', 'string'],
+        ], [
+            'supplier_id.required' => 'Supplier wajib dipilih.',
+            'supplier_id.exists' => 'Supplier yang dipilih tidak valid.',
+            'order_number.required' => 'Nomor order wajib diisi.',
+            'reciept_date.required' => 'Tanggal terima wajib diisi.',
+        ]);
 
+        try {
             $existingCart = PurchaseCart::where('user_id', auth()->id())->get();
 
             $subtotal = (int) str_replace([',', '.'], '', $request->subtotal ?? 0);
@@ -203,6 +214,46 @@ class PurchaseController extends Controller
                 $status = 'hutang';
             } else {
                 $status = 'lunas';
+            }
+
+            if ($request->status === 'draft') {
+                $purchase = Purchase::create([
+                    'user_id' => auth()->id(),
+                    'supplier_id' => $request->supplier_id,
+                    'treasury_id' => $request->treasury_id,
+                    'warehouse_id' => auth()->user()->warehouse_id,
+                    'order_number' => $request->order_number,
+                    'invoice' => $request->invoice,
+                    'subtotal' => $subtotal,
+                    'potongan' => $potongan,
+                    'grand_total' => $grandTotal,
+                    'pay' => $pay,
+                    'reciept_date' => Carbon::createFromFormat('d/m/Y', $request->reciept_date)->format('Y-m-d'),
+                    'description' => $request->description,
+                    'tax' => $request->tax,
+                    'status' => 'draft',
+                    'payment_method' => $paymentMethod,
+                    'cash' => $cash,
+                    'transfer' => $transfer,
+                ]);
+
+                foreach ($existingCart as $cart) {
+                    PurchaseCartDraft::create([
+                        'purchase_id' => $purchase->id,
+                        'user_id' => auth()->id(),
+                        'product_id' => $cart->product_id,
+                        'unit_id' => $cart->unit_id,
+                        'quantity' => $cart->quantity,
+                        'discount_fix' => $cart->discount_fix,
+                        'discount_percent' => $cart->discount_percent,
+                        'price_unit' => $cart->price_unit,
+                        'total_price' => $cart->total_price,
+                    ]);
+                }
+
+                PurchaseCart::where('user_id', auth()->id())->delete();
+
+                return redirect()->route('pembelian-draft.index')->with('success', 'Draft pembelian berhasil disimpan');
             }
 
             $purchase = Purchase::create([
