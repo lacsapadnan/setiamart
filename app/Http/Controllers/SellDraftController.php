@@ -12,6 +12,7 @@ use App\Models\SellDetail;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\CashflowService;
+use App\Support\QuantityInputNormalizer;
 use App\Support\SalePaymentMethodResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -368,9 +369,9 @@ class SellDraftController extends Controller
                     return response()->json(['errors' => ['Produk tidak ditemukan.']], 422);
                 }
 
-                $quantityDus = isset($inputRequest['quantity_dus']) ? intval($inputRequest['quantity_dus']) : 0;
-                $quantityPak = isset($inputRequest['quantity_pak']) ? intval($inputRequest['quantity_pak']) : 0;
-                $quantityEceran = isset($inputRequest['quantity_eceran']) ? intval($inputRequest['quantity_eceran']) : 0;
+                $quantityDus = QuantityInputNormalizer::toFloatOrNull($inputRequest['quantity_dus'] ?? null);
+                $quantityPak = QuantityInputNormalizer::toFloatOrNull($inputRequest['quantity_pak'] ?? null);
+                $quantityEceran = QuantityInputNormalizer::toFloatOrNull($inputRequest['quantity_eceran'] ?? null);
 
                 if (! isset($inputRequest['unit_dus'])) {
                     continue;
@@ -385,7 +386,7 @@ class SellDraftController extends Controller
                 }
 
                 // Process quantity_dus if it exists
-                if ($quantityDus) {
+                if ($quantityDus !== null && $quantityDus > 0) {
                     $validationError = $this->validateSellPriceInput($inputRequest['price_dus'] ?? null, $product->name, 'dus');
                     if ($validationError !== null) {
                         DB::rollBack();
@@ -397,7 +398,7 @@ class SellDraftController extends Controller
                 }
 
                 // Process quantity_pak if it exists
-                if ($quantityPak) {
+                if ($quantityPak !== null && $quantityPak > 0) {
                     $validationError = $this->validateSellPriceInput($inputRequest['price_pak'] ?? null, $product->name, 'pak');
                     if ($validationError !== null) {
                         DB::rollBack();
@@ -409,7 +410,7 @@ class SellDraftController extends Controller
                 }
 
                 // Process quantity_eceran if it exists
-                if ($quantityEceran) {
+                if ($quantityEceran !== null && $quantityEceran > 0) {
                     $validationError = $this->validateSellPriceInput($inputRequest['price_eceran'] ?? null, $product->name, 'eceran');
                     if ($validationError !== null) {
                         DB::rollBack();
@@ -455,14 +456,16 @@ class SellDraftController extends Controller
         return (float) $normalizedPrice;
     }
 
-    private function processCartItem($productId, $sellId, $quantity, $unitId, $price, $discount)
+    private function processCartItem($productId, $sellId, $quantity, $unitId, $price, $discount): void
     {
-        $totalPrice = $price * $quantity;
-
-        // Apply the discount to the total price if the discount is provided
-        if ($discount > 0) {
-            $totalPrice -= $discount;
+        $quantity = QuantityInputNormalizer::toFloatOrNull($quantity) ?? 0.0;
+        if ($quantity <= 0) {
+            return;
         }
+
+        $quantity = round($quantity, 2);
+        $price = (float) str_replace(',', '', (string) $price);
+        $discount = (float) str_replace(',', '', (string) $discount);
 
         if ($sellId != null) {
             $existingCart = SellCartDraft::where('sell_id', $sellId)
@@ -470,7 +473,7 @@ class SellDraftController extends Controller
                 ->where('unit_id', $unitId)
                 ->first();
             if ($existingCart) {
-                $existingCart->quantity += $quantity;
+                $existingCart->quantity = round((float) $existingCart->quantity + $quantity, 2);
                 $existingCart->save();
             } else {
                 SellCartDraft::create([
@@ -486,8 +489,11 @@ class SellDraftController extends Controller
         }
     }
 
-    private function decreaseInventory($productId, $quantity, $unitId)
+    private function decreaseInventory($productId, $quantity, $unitId): void
     {
+        $quantity = QuantityInputNormalizer::toFloatOrNull($quantity) ?? 0.0;
+        $quantity = round($quantity, 2);
+
         $product = Product::find($productId);
         $inventory = Inventory::where('product_id', $productId)
             ->where('warehouse_id', auth()->user()->warehouse_id)
@@ -534,8 +540,15 @@ class SellDraftController extends Controller
 
     public function updateCartQuantity(Request $request, $id)
     {
+        if ($request->has('quantity')) {
+            $parsedQuantity = QuantityInputNormalizer::toFloatOrNull($request->input('quantity'));
+            if ($parsedQuantity !== null) {
+                $request->merge(['quantity' => $parsedQuantity]);
+            }
+        }
+
         $request->validate([
-            'quantity' => 'required|integer|min:1',
+            'quantity' => 'required|numeric|decimal:0,2|min:0.01',
         ]);
 
         $sellCart = SellCartDraft::findOrFail($id);
@@ -545,8 +558,8 @@ class SellDraftController extends Controller
             ->first();
 
         // Calculate inventory adjustment
-        $oldQuantity = $sellCart->quantity;
-        $newQuantity = $request->quantity;
+        $oldQuantity = round((float) $sellCart->quantity, 2);
+        $newQuantity = round((float) $request->quantity, 2);
 
         // Restore old quantity to inventory
         if ($sellCart->unit_id == $product->unit_dus) {
@@ -584,8 +597,8 @@ class SellDraftController extends Controller
             'success' => true,
             'message' => 'Quantity updated successfully',
             'data' => [
-                'quantity' => $sellCart->quantity,
-                'subtotal' => $sellCart->price * $sellCart->quantity - $sellCart->diskon,
+                'quantity' => round((float) $sellCart->quantity, 2),
+                'subtotal' => round((float) $sellCart->price * (float) $sellCart->quantity - (float) $sellCart->diskon, 2),
             ],
         ]);
     }

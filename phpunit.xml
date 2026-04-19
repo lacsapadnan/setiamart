@@ -19,10 +19,15 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <!-- Stable key for tests (encryption, sessions); must match .env.testing.example if you use that file -->
+        <env name="APP_KEY" value="base64:0HEeQnXsQizJS7/r8bon17mR4N5bj6tZIk1ONxiP01E="/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_DRIVER" value="array"/>
-        <!-- <env name="DB_CONNECTION" value="sqlite"/> -->
-        <!-- <env name="DB_DATABASE" value=":memory:"/> -->
+        <!--
+            Database: set DB_* in .env.testing (see .env.testing.example). Use a dedicated database name
+            (e.g. pos_testing), never your development DB — RefreshDatabase will reset the test database.
+            SQLite is not supported for this project until migrations avoid MySQL-only syntax.
+        -->
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

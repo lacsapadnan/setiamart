@@ -317,17 +317,36 @@
         input.value = value;
     }
 
+    function parseIdLocaleNumber(raw) {
+        const t = String(raw == null ? '' : raw).trim().replace(/\s/g, '');
+        if (!t) {
+            return 0;
+        }
+        const lastComma = t.lastIndexOf(',');
+        const lastDot = t.lastIndexOf('.');
+        if (lastComma !== -1 && lastDot !== -1) {
+            const normalized = lastComma > lastDot
+                ? t.replace(/\./g, '').replace(',', '.')
+                : t.replace(/,/g, '');
+            const n = parseFloat(normalized);
+            return Number.isFinite(n) ? n : 0;
+        }
+        if (lastComma !== -1) {
+            const n = parseFloat(t.replace(',', '.'));
+            return Number.isFinite(n) ? n : 0;
+        }
+        const n = parseFloat(t.replace(/\./g, ''));
+        return Number.isFinite(n) ? n : 0;
+    }
+
     function calculateTotal() {
-        // Parse Indonesian number format (dots as thousands separators)
-        var subtotalText = document.getElementById('subtotal').value.replace(/[.,]/g, '');
-        var subtotal = parseFloat(subtotalText) || 0;
+        var subtotal = parseIdLocaleNumber(document.getElementById('subtotal').value);
         
         // If subtotal is 0, try to calculate from cart items
         if (subtotal === 0 || isNaN(subtotal)) {
             let calculatedSubtotal = 0;
             $('tr[data-cart-id]').each(function() {
-                const subtotalText = $(this).find('.cart-subtotal').text().replace(/[.,]/g, '');
-                calculatedSubtotal += parseInt(subtotalText) || 0;
+                calculatedSubtotal += parseIdLocaleNumber($(this).find('.cart-subtotal').text());
             });
             subtotal = calculatedSubtotal;
             // Update the subtotal field with proper formatting
@@ -1015,8 +1034,7 @@
                         // Recalculate subtotal from all cart items
                         let subtotal = 0;
                         $('tr[data-cart-id]').each(function() {
-                            const subtotalText = $(this).find('.cart-subtotal').text().replace(/[.,]/g, '');
-                            subtotal += parseInt(subtotalText) || 0;
+                            subtotal += parseIdLocaleNumber($(this).find('.cart-subtotal').text());
                         });
 
                         $('#subtotal').val(new Intl.NumberFormat('id-ID').format(subtotal));

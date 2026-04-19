@@ -11,6 +11,7 @@ use App\Models\PurchaseDetail;
 use App\Models\Supplier;
 use App\Models\Unit;
 use App\Services\CashflowService;
+use App\Support\QuantityInputNormalizer;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -361,16 +362,19 @@ class PurchaseDraftController extends Controller
                 continue;
             }
 
-            if (! empty($inputRequest['quantity_dus'])) {
-                $this->processCartItem($purchase->id, auth()->id(), $productId, $inputRequest['quantity_dus'], $inputRequest['unit_dus'], $inputRequest['price_dus'], $inputRequest['discount_fix_dus'] ?? 0, $inputRequest['discount_percent_dus'] ?? 0);
+            $quantityDus = QuantityInputNormalizer::toFloatOrNull($inputRequest['quantity_dus'] ?? null);
+            if ($quantityDus !== null && $quantityDus > 0) {
+                $this->processCartItem($purchase->id, auth()->id(), $productId, $quantityDus, $inputRequest['unit_dus'], $inputRequest['price_dus'], $inputRequest['discount_fix_dus'] ?? 0, $inputRequest['discount_percent_dus'] ?? 0);
             }
 
-            if (! empty($inputRequest['quantity_pak'])) {
-                $this->processCartItem($purchase->id, auth()->id(), $productId, $inputRequest['quantity_pak'], $inputRequest['unit_pak'], $inputRequest['price_pak'], $inputRequest['discount_fix_pak'] ?? 0, $inputRequest['discount_percent_pak'] ?? 0);
+            $quantityPak = QuantityInputNormalizer::toFloatOrNull($inputRequest['quantity_pak'] ?? null);
+            if ($quantityPak !== null && $quantityPak > 0) {
+                $this->processCartItem($purchase->id, auth()->id(), $productId, $quantityPak, $inputRequest['unit_pak'], $inputRequest['price_pak'], $inputRequest['discount_fix_pak'] ?? 0, $inputRequest['discount_percent_pak'] ?? 0);
             }
 
-            if (! empty($inputRequest['quantity_eceran'])) {
-                $this->processCartItem($purchase->id, auth()->id(), $productId, $inputRequest['quantity_eceran'], $inputRequest['unit_eceran'], $inputRequest['price_eceran'], $inputRequest['discount_fix_eceran'] ?? 0, $inputRequest['discount_percent_eceran'] ?? 0);
+            $quantityEceran = QuantityInputNormalizer::toFloatOrNull($inputRequest['quantity_eceran'] ?? null);
+            if ($quantityEceran !== null && $quantityEceran > 0) {
+                $this->processCartItem($purchase->id, auth()->id(), $productId, $quantityEceran, $inputRequest['unit_eceran'], $inputRequest['price_eceran'], $inputRequest['discount_fix_eceran'] ?? 0, $inputRequest['discount_percent_eceran'] ?? 0);
             }
         }
 
@@ -387,6 +391,13 @@ class PurchaseDraftController extends Controller
 
     public function updateCartQuantity(Request $request, $id)
     {
+        if ($request->has('quantity')) {
+            $parsedQuantity = QuantityInputNormalizer::toFloatOrNull($request->input('quantity'));
+            if ($parsedQuantity !== null) {
+                $request->merge(['quantity' => $parsedQuantity]);
+            }
+        }
+
         $request->validate([
             'quantity' => 'required|numeric|decimal:0,2|min:0.01',
         ]);
@@ -421,7 +432,12 @@ class PurchaseDraftController extends Controller
 
     private function processCartItem($purchaseId, $userId, $productId, $quantity, $unitId, $price, $discountFix, $discountPercent): void
     {
-        $quantity = round((float) $quantity, 2);
+        $quantity = QuantityInputNormalizer::toFloatOrNull($quantity) ?? 0.0;
+        if ($quantity <= 0) {
+            return;
+        }
+
+        $quantity = round($quantity, 2);
         $price = (float) str_replace(',', '', (string) $price);
         $discountFix = (float) str_replace(',', '', (string) $discountFix);
         $discountPercent = (float) str_replace(',', '', (string) $discountPercent);
