@@ -121,9 +121,11 @@ class PurchaseDraftController extends Controller
 
         $request->validate([
             'supplier_id' => ['required', 'exists:suppliers,id'],
+            'invoice' => ['required', 'string', 'max:255'],
         ], [
             'supplier_id.required' => 'Supplier wajib dipilih.',
             'supplier_id.exists' => 'Supplier yang dipilih tidak valid.',
+            'invoice.required' => 'No. Faktur Supplier wajib diisi.',
         ]);
 
         $draftCart = PurchaseCartDraft::where('purchase_id', $purchase->id)->get();

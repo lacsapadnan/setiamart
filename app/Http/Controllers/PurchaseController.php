@@ -161,11 +161,13 @@ class PurchaseController extends Controller
             'supplier_id' => ['required', 'exists:suppliers,id'],
             'order_number' => ['required', 'string', 'max:255'],
             'reciept_date' => ['required', 'string'],
+            'invoice' => ['required', 'string', 'max:255'],
         ], [
             'supplier_id.required' => 'Supplier wajib dipilih.',
             'supplier_id.exists' => 'Supplier yang dipilih tidak valid.',
             'order_number.required' => 'Nomor order wajib diisi.',
             'reciept_date.required' => 'Tanggal terima wajib diisi.',
+            'invoice.required' => 'No. Faktur Supplier wajib diisi.',
         ]);
 
         try {

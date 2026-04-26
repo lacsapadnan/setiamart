@@ -552,9 +552,19 @@
                 icon: 'error',
                 buttonsStyling: false,
                 confirmButtonText: 'Ok, mengerti!',
-                customClass: {
-                    confirmButton: 'btn btn-danger'
-                }
+                customClass: { confirmButton: 'btn btn-danger' }
+            });
+            return;
+        }
+
+        if (!invoice || !invoice.trim()) {
+            Swal.fire({
+                title: 'Gagal',
+                text: 'No. Faktur Supplier wajib diisi.',
+                icon: 'error',
+                buttonsStyling: false,
+                confirmButtonText: 'Ok, mengerti!',
+                customClass: { confirmButton: 'btn btn-danger' }
             });
             return;
         }
@@ -584,9 +594,19 @@
                 icon: 'error',
                 buttonsStyling: false,
                 confirmButtonText: 'Ok, mengerti!',
-                customClass: {
-                    confirmButton: 'btn btn-danger'
-                }
+                customClass: { confirmButton: 'btn btn-danger' }
+            });
+            return;
+        }
+
+        if (!invoice || !invoice.trim()) {
+            Swal.fire({
+                title: 'Gagal',
+                text: 'No. Faktur Supplier wajib diisi.',
+                icon: 'error',
+                buttonsStyling: false,
+                confirmButtonText: 'Ok, mengerti!',
+                customClass: { confirmButton: 'btn btn-danger' }
             });
             return;
         }
