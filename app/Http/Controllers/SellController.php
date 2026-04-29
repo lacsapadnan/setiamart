@@ -211,6 +211,15 @@ class SellController extends Controller
             $status = 'lunas';
         }
 
+        if ($status === 'piutang') {
+            $authorizedAt = session('piutang_authorization');
+            if (! $authorizedAt || now()->timestamp - $authorizedAt > 300) {
+                return redirect()->back()->withInput()
+                    ->withErrors('Transaksi piutang memerlukan otorisasi password user master.');
+            }
+            session()->forget(['piutang_authorization', 'piutang_authorized_by']);
+        }
+
         $grandTotalValid = 0;
         foreach ($sellCart as $sc) {
             $grandTotalValid += (int) preg_replace('/[,.]/', '', ($sc->price * $sc->quantity) - $sc->diskon);
@@ -460,14 +469,24 @@ class SellController extends Controller
 
     public function validateMasterPassword(Request $request)
     {
-        $user = User::where('id', $request->user_id)->first();
+        $user = User::role('master')
+            ->where('id', $request->user_id)
+            ->first();
 
-        // check the password request is same with user password
-        if (password_verify($request->password, $user->password)) {
-            return response()->json(['status' => 'success']);
-        } else {
+        if (! $user) {
             return response()->json(['status' => 'failed']);
         }
+
+        if (password_verify($request->password, $user->password)) {
+            session([
+                'piutang_authorization' => now()->timestamp,
+                'piutang_authorized_by' => $user->id,
+            ]);
+
+            return response()->json(['status' => 'success']);
+        }
+
+        return response()->json(['status' => 'failed']);
     }
 
     /**

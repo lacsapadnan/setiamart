@@ -121,6 +121,15 @@ class SellDraftController extends Controller
             $status = 'lunas';
         }
 
+        if ($status === 'piutang') {
+            $authorizedAt = session('piutang_authorization');
+            if (! $authorizedAt || now()->timestamp - $authorizedAt > 300) {
+                return redirect()->back()->withInput()
+                    ->withErrors('Transaksi piutang memerlukan otorisasi password user master.');
+            }
+            session()->forget(['piutang_authorization', 'piutang_authorized_by']);
+        }
+
         $rawPaymentMethod = $request->input('payment_method');
         $paymentMethod = SalePaymentMethodResolver::resolve(
             is_string($rawPaymentMethod) ? $rawPaymentMethod : null,

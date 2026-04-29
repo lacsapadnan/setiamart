@@ -613,13 +613,11 @@
         document.getElementById('order_number_form2').value = document.getElementById('order_number').value;
         document.getElementById('customer_form2').value = document.getElementById('customer').value;
         document.getElementById('user_id_form2').value = document.getElementById('user_id').value;
-        var customerId = document.getElementById('customer_form2').value;
-        var cash = document.getElementById('cash').value;
-        var transfer = document.getElementById('transfer').value;
-        var grandTotal = document.getElementById('grandTotal').value;
 
-        cash = parseInt(cash.replace(/[.,]/g, '')) || 0;
-        transfer = parseInt(transfer.replace(/[.,]/g, '')) || 0;
+        var cash = parseInt(document.getElementById('cash').value.replace(/[.,]/g, '')) || 0;
+        var transfer = parseInt(document.getElementById('transfer').value.replace(/[.,]/g, '')) || 0;
+        var grandTotal = parseInt(document.getElementById('grandTotal').value.replace(/[.,]/g, '')) || 0;
+        var totalPayment = cash + transfer;
 
         // Disable submit buttons to prevent double submission
         const submitButtons = document.querySelectorAll('button[type="button"]');
@@ -627,37 +625,15 @@
             button.disabled = true;
         });
 
-        if (cash < grandTotal || transfer < grandTotal || (cash + transfer) < grandTotal) {
-            showLoading(); // Show loading overlay
-            $.ajax({
-                url: '/check-customer-status', // Update the URL to your Laravel route
-                method: 'GET',
-                data: {
-                    customer_id: customerId
-                },
-                success: function(response) {
-                    if (response.status === 'not_piutang') {
-                        document.getElementById('form2').submit();
-                    } else {
-                        hideLoading(); // Hide loading overlay if showing modal
-                        $('#passwordModal').modal('show');
-                        // Re-enable buttons if showing modal
-                        submitButtons.forEach(button => {
-                            button.disabled = false;
-                        });
-                    }
-                },
-                error: function(error) {
-                    console.error('Error checking customer status:', error);
-                    hideLoading(); // Hide loading overlay on error
-                    // Re-enable buttons on error
-                    submitButtons.forEach(button => {
-                        button.disabled = false;
-                    });
-                }
+        if (totalPayment < grandTotal) {
+            // Partial payment will result in piutang — always require master authorization
+            hideLoading();
+            $('#passwordModal').modal('show');
+            submitButtons.forEach(button => {
+                button.disabled = false;
             });
         } else {
-            showLoading(); // Show loading overlay
+            showLoading();
             document.getElementById('form2').submit();
         }
     }

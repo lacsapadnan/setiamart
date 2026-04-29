@@ -523,26 +523,18 @@
             document.getElementById('order_number_form2').value = document.getElementById('order_number').value;
             document.getElementById('customer_form2').value = document.getElementById('customer').value;
             document.getElementById('user_id_form2').value = document.getElementById('user_id').value;
-            var customerId = document.getElementById('customer_form2').value;
 
-            // Make an AJAX request to check customer status
-            $.ajax({
-                url: '/check-customer-status', // Update the URL to your Laravel route
-                method: 'GET',
-                data: {
-                    customer_id: customerId
-                },
-                success: function(response) {
-                    if (response.status === 'not_piutang') {
-                        document.getElementById('form2').submit();
-                    } else {
-                        $('#passwordModal').modal('show');
-                    }
-                },
-                error: function(error) {
-                    console.error('Error checking customer status:', error);
-                }
-            });
+            var cash = parseInt(document.getElementById('cash').value.replace(/[.,]/g, '')) || 0;
+            var transfer = parseInt(document.getElementById('transfer').value.replace(/[.,]/g, '')) || 0;
+            var grandTotal = parseInt(document.getElementById('grandTotal').value.replace(/[.,]/g, '')) || 0;
+            var totalPayment = cash + transfer;
+
+            if (totalPayment < grandTotal) {
+                // Partial payment will result in piutang — always require master authorization
+                $('#passwordModal').modal('show');
+            } else {
+                document.getElementById('form2').submit();
+            }
         }
 
         function checkMasterUserPassword() {
