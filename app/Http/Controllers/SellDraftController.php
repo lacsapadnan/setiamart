@@ -38,11 +38,19 @@ class SellDraftController extends Controller
 
     public function data()
     {
-        $sells = Sell::with('details.product.unit_dus', 'details.product.unit_pak', 'details.product.unit_eceran', 'warehouse', 'customer')
+        $sells = Sell::with(['cartDrafts', 'warehouse', 'customer'])
             ->where('status', 'draft')
             ->where('warehouse_id', auth()->user()->warehouse_id)
             ->orderBy('id', 'desc')
             ->get();
+
+        $sells->each(function (Sell $sell): void {
+            $fromCart = (int) round($sell->cartDrafts->sum(function (SellCartDraft $row): float {
+                return ((float) $row->price * (float) $row->quantity) - (float) ($row->diskon ?? 0);
+            }));
+
+            $sell->setAttribute('grand_total', $fromCart);
+        });
 
         return response()->json($sells);
     }
@@ -70,7 +78,10 @@ class SellDraftController extends Controller
     {
         $sell = Sell::with('warehouse', 'customer')
             ->where('id', $id)
-            ->first();
+            ->where('status', 'draft')
+            ->where('warehouse_id', auth()->user()->warehouse_id)
+            ->firstOrFail();
+
         $inventories = Inventory::with('product')
             ->where('warehouse_id', auth()->user()->warehouse_id)
             ->get();
@@ -87,7 +98,9 @@ class SellDraftController extends Controller
         }
         $masters = User::role('master')->get();
 
-        return view('pages.sell.show-draft', compact('sell', 'inventories', 'products', 'cart', 'subtotal', 'customers', 'orderNumber', 'masters'));
+        $draftLineItemsMissing = $cart->isEmpty() && (int) $sell->grand_total > 0;
+
+        return view('pages.sell.show-draft', compact('sell', 'inventories', 'products', 'cart', 'subtotal', 'customers', 'orderNumber', 'masters', 'draftLineItemsMissing'));
     }
 
     /**

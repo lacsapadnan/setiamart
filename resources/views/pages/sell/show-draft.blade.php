@@ -32,6 +32,15 @@
 
 @section('content')
 <div class="mt-5 border-0 card card-p-0 card-flush">
+    @if (! empty($draftLineItemsMissing))
+    <div class="mx-3 mt-3 alert alert-warning" role="alert">
+        <strong>Perhatian:</strong> Nominal total masih tercatat di sistem
+        (Rp {{ number_format((int) $sell->grand_total, 0, ',', '.') }}), tetapi tidak ada baris barang di keranjang
+        draft. Hal ini biasanya terjadi jika produk pada draft dihapus dari master data (referensi barang ikut
+        terhapus). Daftar draft kini menampilkan total dari keranjang aktual. Anda bisa menghapus draft ini dan
+        membuat penjualan baru, atau menambahkan ulang barang ke transaksi ini.
+    </div>
+    @endif
     <div class="mt-3">
         <form id="form1">
             <div class="row">
