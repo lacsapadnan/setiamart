@@ -1053,10 +1053,6 @@ class SellController extends Controller
             $date = date('Ymd_His');
             $filename = "sales_{$date}.xlsx";
 
-            if ($count > 20000) {
-                return response('<h1>Dataset Too Large</h1><p>This export contains '.number_format($count).' records. Please use date filters to reduce the dataset size to under 20,000 records.</p>', 413);
-            }
-
             return Excel::download(new SalesExport($filters), $filename);
         } catch (\Exception $e) {
             report($e);
