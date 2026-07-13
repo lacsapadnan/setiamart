@@ -172,22 +172,29 @@
             // Hook export buttons
             var exportButtons = () => {
                 const documentTitle = 'Customer Data Report';
+                const exportOptions = {
+                    columns: [0, 1, 2]
+                };
                 var buttons = new $.fn.dataTable.Buttons(table, {
                     buttons: [{
                             extend: 'copyHtml5',
-                            title: documentTitle
+                            title: documentTitle,
+                            exportOptions: exportOptions
                         },
                         {
                             extend: 'excelHtml5',
-                            title: documentTitle
+                            title: documentTitle,
+                            exportOptions: exportOptions
                         },
                         {
                             extend: 'csvHtml5',
-                            title: documentTitle
+                            title: documentTitle,
+                            exportOptions: exportOptions
                         },
                         {
                             extend: 'pdfHtml5',
-                            title: documentTitle
+                            title: documentTitle,
+                            exportOptions: exportOptions
                         }
                     ]
                 }).container().appendTo($('#kt_datatable_example_buttons'));
@@ -205,7 +212,9 @@
                             exportValue);
 
                         // Trigger click event on hidden datatable export buttons
-                        target.click();
+                        if (target) {
+                            target.click();
+                        }
                     });
                 });
             }
@@ -228,6 +237,7 @@
                     }
 
                     initDatatable();
+                    exportButtons();
                     handleSearchDatatable();
                 }
             };
