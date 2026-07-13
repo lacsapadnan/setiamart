@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Purchase extends Model
 {
     use HasFactory, LogsActivity;
+
     protected $fillable = [
         'user_id',
         'supplier_id',
@@ -31,6 +32,11 @@ class Purchase extends Model
         'payment_method',
         'cash',
         'transfer',
+    ];
+
+    protected $casts = [
+        'reciept_date' => 'date',
+        'due_date' => 'date',
     ];
 
     public function user()
@@ -65,6 +71,6 @@ class Purchase extends Model
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->useLogName('purchase_transactions')
-            ->setDescriptionForEvent(fn(string $eventName) => "Purchase {$this->order_number} has been {$eventName}");
+            ->setDescriptionForEvent(fn (string $eventName) => "Purchase {$this->order_number} has been {$eventName}");
     }
 }

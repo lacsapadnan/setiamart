@@ -7,34 +7,36 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\FromQuery;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithCustomChunkSize;
+use Maatwebsite\Excel\Concerns\WithHeadings;
+use Maatwebsite\Excel\Concerns\WithMapping;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
-class SalesExport implements
-    FromQuery,
-    WithHeadings,
-    WithMapping,
-    WithColumnFormatting,
-    WithCustomChunkSize
+class SalesExport implements FromQuery, WithColumnFormatting, WithCustomChunkSize, WithHeadings, WithMapping
 {
     use Exportable;
 
     protected ?string $fromDate;
+
     protected ?string $toDate;
+
     protected ?int $warehouseId;
+
     protected ?int $userId;
+
     protected ?string $search;
+
     protected ?int $restrictWarehouseId;
+
     protected ?int $restrictCashierId;
+
     public function __construct(array $filters = [])
     {
         $this->fromDate = $filters['from_date'] ?? null;
         $this->toDate = $filters['to_date'] ?? null;
-        $this->warehouseId = isset($filters['warehouse']) && $filters['warehouse'] !== '' ? (int)$filters['warehouse'] : null;
-        $this->userId = isset($filters['user_id']) && $filters['user_id'] !== '' ? (int)$filters['user_id'] : null;
+        $this->warehouseId = isset($filters['warehouse']) && $filters['warehouse'] !== '' ? (int) $filters['warehouse'] : null;
+        $this->userId = isset($filters['user_id']) && $filters['user_id'] !== '' ? (int) $filters['user_id'] : null;
         $this->search = $filters['search'] ?? null;
 
         // Restrictions applied for non-master users
@@ -85,7 +87,7 @@ class SalesExport implements
         }
 
         // Apply search filter
-        if (!empty($this->search)) {
+        if (! empty($this->search)) {
             $searchValue = $this->search;
             $query->where(function (Builder $subQuery) use ($searchValue) {
                 $subQuery->where('sells.order_number', 'like', "%{$searchValue}%")
@@ -124,15 +126,14 @@ class SalesExport implements
             $row->customer_name ?? '',
             $row->warehouse_name ?? '',
             $row->payment_method ?? '',
-            (float)($row->cash ?? 0),
-            (float)($row->transfer ?? 0),
-            (float)($row->grand_total ?? 0),
+            $this->roundCurrency($row->cash ?? 0),
+            $this->roundCurrency($row->transfer ?? 0),
+            $this->roundCurrency($row->grand_total ?? 0),
             $row->status ?? '',
             // ↓ aman untuk string/null
-            !empty($row->created_at) ? Carbon::parse($row->created_at)->format('Y-m-d H:i:s') : '',
+            ! empty($row->created_at) ? Carbon::parse($row->created_at)->format('Y-m-d H:i:s') : '',
         ];
     }
-
 
     public function columnFormats(): array
     {
@@ -150,5 +151,19 @@ class SalesExport implements
     public function chunkSize(): int
     {
         return 1000; // Reduced from 2000 to 500 for better performance
+    }
+
+    private function roundCurrency(mixed $value): float
+    {
+        if (is_numeric($value)) {
+            return round((float) $value, 0);
+        }
+
+        $normalized = str_replace(',', '', (string) $value);
+        if (! is_numeric($normalized)) {
+            return 0.0;
+        }
+
+        return round((float) $normalized, 0);
     }
 }

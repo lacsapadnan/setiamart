@@ -47,7 +47,7 @@
                         <div class="input-group" id="kt_td_picker_date_only" data-td-target-input="nearest"
                             data-td-target-toggle="nearest">
                             <input id="kt_td_picker_date_only_input" type="text" class="form-control"
-                                data-td-target="#kt_td_picker_date_only" name="reciept_date" value="{{ old('reciept_date', $isDraftMode ? optional($purchase->reciept_date)->format('Y-m-d') : date('Y-m-d')) }}"
+                                data-td-target="#kt_td_picker_date_only" name="reciept_date" value="{{ old('reciept_date', $isDraftMode && $purchase->reciept_date ? $purchase->reciept_date->format('d/m/Y') : date('d/m/Y')) }}"
                                 disabled />
                             <span class="input-group-text" data-td-target="#kt_td_picker_date_only"
                                 data-td-toggle="datetimepicker">
@@ -626,7 +626,8 @@
     new tempusDominus.TempusDominus(document.getElementById("kt_td_picker_date_only"), {
             localization: {
                 locale: "id",
-                startOfTheWeek: 1
+                startOfTheWeek: 1,
+                format: "dd/MM/yyyy"
             },
             display: {
                 viewMode: "calendar",
