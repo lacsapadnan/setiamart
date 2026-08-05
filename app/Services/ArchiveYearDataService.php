@@ -306,37 +306,82 @@ class ArchiveYearDataService
             }
 
             $where = $this->mysqldumpWhereClause($definition, $start, $end);
-
-            $process = Process::path(base_path())
-                ->env([
-                    'MYSQL_PWD' => (string) $password,
-                ])
-                ->run([
-                    $dumpBinary,
-                    '--user='.$username,
-                    '--host='.$host,
-                    '--port='.$port,
+            $output = $this->runMysqlDump(
+                $dumpBinary,
+                $database,
+                $username,
+                $password,
+                $host,
+                $port,
+                $table,
+                [
                     '--no-create-info',
                     '--skip-triggers',
                     '--complete-insert',
+                    '--quick',
                     '--where='.$where,
-                    $database,
-                    $table,
-                ]);
+                ]
+            );
 
-            if ($process->failed()) {
-                throw new RuntimeException("Archive dump failed for table [{$table}]: ".$process->errorOutput());
-            }
-
-            file_put_contents($absolutePath, "\n-- Table: {$table}\n".$process->output(), FILE_APPEND);
+            file_put_contents($absolutePath, "\n-- Table: {$table}\n".$output, FILE_APPEND);
         }
 
         return $relativePath;
     }
 
     /**
-     * @param  list<string>|null  $safeColumns
+     * @param  list<string>  $extraArgs
      */
+    private function runMysqlDump(
+        string $dumpBinary,
+        string $database,
+        ?string $username,
+        ?string $password,
+        string $host,
+        string $port,
+        string $table,
+        array $extraArgs
+    ): string {
+        $tempRelative = 'backups/.tmp_archive_'.$table.'_'.uniqid('', true).'.sql';
+        $tempAbsolute = storage_path('app/'.$tempRelative);
+
+        $command = array_merge(
+            [
+                $dumpBinary,
+                '--user='.$username,
+                '--host='.$host,
+                '--port='.$port,
+                '--single-transaction',
+                '--result-file='.$tempAbsolute,
+            ],
+            $extraArgs,
+            [$database, $table]
+        );
+
+        $process = Process::path(base_path())
+            ->env([
+                'MYSQL_PWD' => (string) $password,
+            ])
+            ->forever()
+            ->run($command);
+
+        if ($process->failed()) {
+            if (file_exists($tempAbsolute)) {
+                unlink($tempAbsolute);
+            }
+
+            throw new RuntimeException("Archive dump failed for table [{$table}]: ".$process->errorOutput());
+        }
+
+        $output = file_exists($tempAbsolute) ? (string) file_get_contents($tempAbsolute) : '';
+
+        if (file_exists($tempAbsolute)) {
+            unlink($tempAbsolute);
+        }
+
+        return $output;
+    }
+
     private function appendReferenceDumps(
         string $absolutePath,
         string $dumpBinary,
@@ -365,29 +410,25 @@ class ArchiveYearDataService
                 continue;
             }
 
-            $process = Process::path(base_path())
-                ->env([
-                    'MYSQL_PWD' => (string) $password,
-                ])
-                ->run([
-                    $dumpBinary,
-                    '--user='.$username,
-                    '--host='.$host,
-                    '--port='.$port,
+            $output = $this->runMysqlDump(
+                $dumpBinary,
+                $database,
+                $username,
+                $password,
+                $host,
+                $port,
+                $table,
+                [
                     '--no-create-info',
                     '--skip-triggers',
                     '--complete-insert',
                     '--insert-ignore',
+                    '--quick',
                     '--where=1',
-                    $database,
-                    $table,
-                ]);
+                ]
+            );
 
-            if ($process->failed()) {
-                throw new RuntimeException("Archive dump failed for reference table [{$table}]: ".$process->errorOutput());
-            }
-
-            file_put_contents($absolutePath, "\n-- Table: {$table} ({$definition['label']})\n".$process->output(), FILE_APPEND);
+            file_put_contents($absolutePath, "\n-- Table: {$table} ({$definition['label']})\n".$output, FILE_APPEND);
         }
     }
 

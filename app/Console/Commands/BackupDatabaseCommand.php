@@ -14,7 +14,9 @@ class BackupDatabaseCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'db:backup {--filename= : Optional backup filename (.sql)}';
+    protected $signature = 'db:backup
+                            {--filename= : Optional backup filename (.sql)}
+                            {--timeout=0 : Process timeout in seconds (0 = no timeout)}';
 
     /**
      * The console command description.
@@ -49,26 +51,43 @@ class BackupDatabaseCommand extends Command
         $relativePath = 'backups/'.basename($fileName);
         $absolutePath = storage_path('app/'.$relativePath);
 
-        $process = Process::path(base_path())
+        $timeout = (int) $this->option('timeout');
+
+        $this->info('Starting mysqldump (this may take several minutes on large databases)...');
+
+        $pending = Process::path(base_path())
             ->env([
                 'MYSQL_PWD' => (string) $password,
-            ])
-            ->run([
-                $dumpBinary,
-                '--user='.$username,
-                '--host='.$host,
-                '--port='.$port,
-                '--result-file='.$absolutePath,
-                $database,
             ]);
+
+        // Large POS databases routinely exceed Laravel's default 60s process timeout.
+        $pending = $timeout > 0 ? $pending->timeout($timeout) : $pending->forever();
+
+        $process = $pending->run([
+            $dumpBinary,
+            '--user='.$username,
+            '--host='.$host,
+            '--port='.$port,
+            '--single-transaction',
+            '--quick',
+            '--result-file='.$absolutePath,
+            $database,
+        ]);
 
         if ($process->failed()) {
             $this->error('Database backup failed.');
+            if (filled($process->errorOutput())) {
+                $this->error($process->errorOutput());
+            }
 
             return self::FAILURE;
         }
 
-        $this->info($relativePath);
+        $sizeMb = file_exists($absolutePath)
+            ? round(filesize($absolutePath) / 1024 / 1024, 2)
+            : 0;
+
+        $this->info($relativePath." ({$sizeMb} MB)");
 
         return self::SUCCESS;
     }
