@@ -23,6 +23,7 @@ class SendStockController extends Controller
     {
         $this->stockTransferService = $stockTransferService;
     }
+
     /**
      * Display a listing of the resource.
      */
@@ -37,7 +38,7 @@ class SendStockController extends Controller
             ->completed()
             ->orderBy('id', 'desc')
             ->get();
-        
+
         return response()->json($sendStok);
     }
 
@@ -50,6 +51,7 @@ class SendStockController extends Controller
         $products = Product::where('isShow', true)->orderBy('id', 'asc')->get();
         $units = Unit::orderBy('id', 'asc')->get();
         $cart = SendStockCart::with('product', 'unit')->where('user_id', auth()->id())->get();
+
         return view('pages.sendStok.create', compact('warehouses', 'products', 'units', 'cart'));
     }
 
@@ -75,17 +77,11 @@ class SendStockController extends Controller
 
             // If saving as draft, create draft without inventory changes
             if ($saveAsDraft) {
-                // Generate send stock number using same format as print function
-                $date = now()->format('Ymd');
-                $count = SendStock::count() + 1;
-                $sendStockNumber = "PS-{$date}-" . str_pad($count, 4, '0', STR_PAD_LEFT);
-
                 $sendStock = SendStock::create([
                     'user_id' => $user->id,
                     'from_warehouse' => $fromWarehouse,
                     'to_warehouse' => $toWarehouse,
                     'status' => 'draft',
-                    'send_stock_number' => $sendStockNumber,
                 ]);
 
                 $sendStockDetails = [];
@@ -108,6 +104,7 @@ class SendStockController extends Controller
                 SendStockCart::where('user_id', $user->id)->delete();
 
                 DB::commit();
+
                 return redirect()->route('pindah-stok-draft.index')->with('success', 'Draft pindah stok berhasil disimpan.');
             }
 
@@ -127,28 +124,24 @@ class SendStockController extends Controller
 
                 // Convert quantity to eceran
                 $quantityEceran = match ($unit) {
-                    $product->unit_dus => (int)$quantity * (int)$product->dus_to_eceran,
-                    $product->unit_pak => (int)$quantity * (int)$product->pak_to_eceran,
-                    default => (int)$quantity
+                    $product->unit_dus => (int) $quantity * (int) $product->dus_to_eceran,
+                    $product->unit_pak => (int) $quantity * (int) $product->pak_to_eceran,
+                    default => (int) $quantity
                 };
 
                 // Check available stock
                 $fromInventory = $inventories[$product->id] ?? null;
 
-                if (!$fromInventory || $fromInventory->quantity < $quantityEceran) {
-                    $stockErrors[] = "Stok tidak mencukupi untuk {$product->name}. Dibutuhkan: $quantityEceran, Tersedia: " . ($fromInventory->quantity ?? 0);
+                if (! $fromInventory || $fromInventory->quantity < $quantityEceran) {
+                    $stockErrors[] = "Stok tidak mencukupi untuk {$product->name}. Dibutuhkan: $quantityEceran, Tersedia: ".($fromInventory->quantity ?? 0);
                 }
             }
 
-            if (!empty($stockErrors)) {
+            if (! empty($stockErrors)) {
                 DB::rollBack();
+
                 return redirect()->back()->withErrors($stockErrors);
             }
-
-            // Generate send stock number using same format as print function
-            $date = now()->format('Ymd');
-            $count = SendStock::count() + 1;
-            $sendStockNumber = "PS-{$date}-" . str_pad($count, 4, '0', STR_PAD_LEFT);
 
             $sendStock = SendStock::create([
                 'user_id' => $user->id,
@@ -156,7 +149,6 @@ class SendStockController extends Controller
                 'to_warehouse' => $toWarehouse,
                 'status' => 'completed',
                 'completed_at' => now(),
-                'send_stock_number' => $sendStockNumber,
             ]);
 
             $sendStockDetails = [];
@@ -202,10 +194,12 @@ class SendStockController extends Controller
             SendStockCart::where('user_id', $user->id)->delete();
 
             DB::commit();
+
             return redirect()->route('pindah-stok.index')->with('success', 'Stok berhasil dipindahkan.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
     }
 
@@ -214,7 +208,8 @@ class SendStockController extends Controller
      */
     public function show(string $id)
     {
-        $sendStockDetail = SendStockDetail::with('product', 'unit',)->where('send_stock_id', $id)->get();
+        $sendStockDetail = SendStockDetail::with('product', 'unit')->where('send_stock_id', $id)->get();
+
         return response()->json($sendStockDetail);
     }
 
@@ -269,8 +264,8 @@ class SendStockController extends Controller
                 ->first();
 
             // Check if there's enough stock in the destination warehouse to decrement
-            if (!$toInventory || $toInventory->quantity < $quantityEceran) {
-                $stockErrors[] = "Stok tidak mencukupi untuk mengembalikan {$product->name}. Dibutuhkan: $quantityEceran, Tersedia: " . ($toInventory->quantity ?? 0);
+            if (! $toInventory || $toInventory->quantity < $quantityEceran) {
+                $stockErrors[] = "Stok tidak mencukupi untuk mengembalikan {$product->name}. Dibutuhkan: $quantityEceran, Tersedia: ".($toInventory->quantity ?? 0);
             }
 
             // Revert stock transfer: Increase in source warehouse, Decrease in destination warehouse
@@ -280,7 +275,7 @@ class SendStockController extends Controller
             Inventory::where('id', $toInventory->id)->decrement('quantity', $quantityEceran);
         }
 
-        if (!empty($stockErrors)) {
+        if (! empty($stockErrors)) {
             return redirect()->back()->withErrors($stockErrors);
         }
 
@@ -304,21 +299,21 @@ class SendStockController extends Controller
                 // Handle bulk items
                 $requests = $request->input('requests');
 
-                if (empty($requests) || !is_array($requests)) {
+                if (empty($requests) || ! is_array($requests)) {
                     return response()->json(['error' => 'No items provided'], 400);
                 }
 
                 $itemsAdded = 0;
 
                 foreach ($requests as $index => $inputRequest) {
-                    if (!isset($inputRequest['product_id'])) {
+                    if (! isset($inputRequest['product_id'])) {
                         continue; // Skip if no product_id
                     }
 
                     $productId = $inputRequest['product_id'];
 
                     // Process quantity_dus if it exists and is greater than 0
-                    if (isset($inputRequest['quantity_dus']) && !empty($inputRequest['quantity_dus'])) {
+                    if (isset($inputRequest['quantity_dus']) && ! empty($inputRequest['quantity_dus'])) {
                         $qtyDus = (int) $inputRequest['quantity_dus'];
                         if ($qtyDus > 0 && isset($inputRequest['unit_dus'])) {
                             $this->processCartItem($productId, $qtyDus, $inputRequest['unit_dus']);
@@ -327,7 +322,7 @@ class SendStockController extends Controller
                     }
 
                     // Process quantity_pak if it exists and is greater than 0
-                    if (isset($inputRequest['quantity_pak']) && !empty($inputRequest['quantity_pak'])) {
+                    if (isset($inputRequest['quantity_pak']) && ! empty($inputRequest['quantity_pak'])) {
                         $qtyPak = (int) $inputRequest['quantity_pak'];
                         if ($qtyPak > 0 && isset($inputRequest['unit_pak'])) {
                             $this->processCartItem($productId, $qtyPak, $inputRequest['unit_pak']);
@@ -336,7 +331,7 @@ class SendStockController extends Controller
                     }
 
                     // Process quantity_eceran if it exists and is greater than 0
-                    if (isset($inputRequest['quantity_eceran']) && !empty($inputRequest['quantity_eceran'])) {
+                    if (isset($inputRequest['quantity_eceran']) && ! empty($inputRequest['quantity_eceran'])) {
                         $qtyEceran = (int) $inputRequest['quantity_eceran'];
                         if ($qtyEceran > 0 && isset($inputRequest['unit_eceran'])) {
                             $this->processCartItem($productId, $qtyEceran, $inputRequest['unit_eceran']);
@@ -353,15 +348,16 @@ class SendStockController extends Controller
 
                 return response()->json([
                     'success' => 'Items added to cart successfully.',
-                    'items_added' => $itemsAdded
+                    'items_added' => $itemsAdded,
                 ], 200);
             } else {
                 // Handle single item (original format)
                 $productId = $request->product_id;
                 $product = Product::find($productId);
 
-                if (!$product) {
+                if (! $product) {
                     DB::rollBack();
+
                     return redirect()->back()->with('error', 'Product not found');
                 }
 
@@ -395,15 +391,15 @@ class SendStockController extends Controller
             DB::rollBack();
 
             // Log the error for debugging
-            \Log::error('SendStock addCart error: ' . $e->getMessage(), [
+            \Log::error('SendStock addCart error: '.$e->getMessage(), [
                 'request' => $request->all(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             if ($request->has('requests')) {
-                return response()->json(['error' => 'Failed to add items to cart: ' . $e->getMessage()], 500);
+                return response()->json(['error' => 'Failed to add items to cart: '.$e->getMessage()], 500);
             } else {
-                return redirect()->back()->with('error', 'Failed to add item to cart: ' . $e->getMessage());
+                return redirect()->back()->with('error', 'Failed to add item to cart: '.$e->getMessage());
             }
         }
     }
@@ -435,7 +431,7 @@ class SendStockController extends Controller
     {
         $cart = SendStockCart::find($id);
 
-        if (!$cart) {
+        if (! $cart) {
             return redirect()->back()->with('error', 'Item keranjang tidak ditemukan');
         }
 
@@ -458,8 +454,8 @@ class SendStockController extends Controller
             'success' => true,
             'message' => 'Quantity updated successfully',
             'data' => [
-                'quantity' => $cart->quantity
-            ]
+                'quantity' => $cart->quantity,
+            ],
         ]);
     }
 
@@ -473,11 +469,12 @@ class SendStockController extends Controller
         $totalQuantity += $sendStockDetail->count();
 
         $pdf = Pdf::loadView('pages.sendStok.print', compact('sendStock', 'sendStockDetail', 'totalQuantity', 'sendStockNumber'));
+
         return response()->stream(function () use ($pdf) {
             echo $pdf->output();
         }, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="Pindah-Stok-' . $sendStock->fromWarehouse->name . '-ke-' . $sendStock->toWarehouse->name . '.pdf"'
+            'Content-Disposition' => 'inline; filename="Pindah-Stok-'.$sendStock->fromWarehouse->name.'-ke-'.$sendStock->toWarehouse->name.'.pdf"',
         ]);
     }
 }

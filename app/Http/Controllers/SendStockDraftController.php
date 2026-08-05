@@ -23,6 +23,7 @@ class SendStockDraftController extends Controller
     {
         $this->stockTransferService = $stockTransferService;
     }
+
     /**
      * Display a listing of draft send stocks.
      */
@@ -51,15 +52,16 @@ class SendStockDraftController extends Controller
                 'count' => $sendStokDrafts->count(),
                 'user_role' => $userRoles[0],
                 'user_warehouse' => auth()->user()->warehouse_id,
-                'data' => $sendStokDrafts->toArray()
+                'data' => $sendStokDrafts->toArray(),
             ]);
 
             return response()->json($sendStokDrafts);
         } catch (\Exception $e) {
-            Log::error('Error fetching draft send stock data: ' . $e->getMessage());
+            Log::error('Error fetching draft send stock data: '.$e->getMessage());
+
             return response()->json([
                 'error' => true,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -80,18 +82,12 @@ class SendStockDraftController extends Controller
             return redirect()->back()->with('error', 'Keranjang kosong. Tambahkan produk terlebih dahulu.');
         }
 
-        // Generate send stock number using same format as print function
-        $date = now()->format('Ymd');
-        $count = SendStock::count() + 1;
-        $sendStockNumber = "PS-{$date}-" . str_pad($count, 4, '0', STR_PAD_LEFT);
-
-        // Create draft send stock
+        // Create draft send stock (send_stock_number auto-generated on model)
         $sendStock = SendStock::create([
             'user_id' => $user->id,
             'from_warehouse' => $fromWarehouse,
             'to_warehouse' => $toWarehouse,
             'status' => 'draft',
-            'send_stock_number' => $sendStockNumber,
         ]);
 
         $sendStockDetails = [];
@@ -122,6 +118,7 @@ class SendStockDraftController extends Controller
     public function show(string $id)
     {
         $sendStockDetail = SendStockDetail::with('product', 'unit')->where('send_stock_id', $id)->get();
+
         return response()->json($sendStockDetail);
     }
 
@@ -186,7 +183,7 @@ class SendStockDraftController extends Controller
 
             return redirect()->route('pindah-stok-draft.index')->with('success', 'Draft berhasil dihapus.');
         } catch (\Exception $e) {
-            return redirect()->route('pindah-stok-draft.index')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+            return redirect()->route('pindah-stok-draft.index')->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
     }
 
@@ -230,12 +227,12 @@ class SendStockDraftController extends Controller
                 // Check available stock
                 $fromInventory = $inventories[$product->id] ?? null;
 
-                if (!$fromInventory || $fromInventory->quantity < $quantityEceran) {
-                    $stockErrors[] = "Stok tidak mencukupi untuk {$product->name}. Dibutuhkan: $quantityEceran, Tersedia: " . ($fromInventory->quantity ?? 0);
+                if (! $fromInventory || $fromInventory->quantity < $quantityEceran) {
+                    $stockErrors[] = "Stok tidak mencukupi untuk {$product->name}. Dibutuhkan: $quantityEceran, Tersedia: ".($fromInventory->quantity ?? 0);
                 }
             }
 
-            if (!empty($stockErrors)) {
+            if (! empty($stockErrors)) {
                 return redirect()->back()->with('error', implode('<br>', $stockErrors));
             }
 
@@ -272,7 +269,7 @@ class SendStockDraftController extends Controller
 
             return redirect()->route('pindah-stok-draft.index')->with('success', 'Draft berhasil diselesaikan dan stok telah dipindahkan.');
         } catch (\Exception $e) {
-            return redirect()->route('pindah-stok-draft.index')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+            return redirect()->route('pindah-stok-draft.index')->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
     }
 
@@ -309,14 +306,16 @@ class SendStockDraftController extends Controller
                 }
 
                 DB::commit();
+
                 return response()->json(['success' => 'Items added to cart successfully.'], 200);
             } else {
                 // Handle single item (original format)
                 $productId = $request->product_id;
                 $product = Product::find($productId);
 
-                if (!$product) {
+                if (! $product) {
                     DB::rollBack();
+
                     return redirect()->back()->with('error', 'Product not found');
                 }
 
@@ -334,15 +333,16 @@ class SendStockDraftController extends Controller
                 }
 
                 DB::commit();
+
                 return redirect()->back()->with('success', 'Produk berhasil dimasukan ke keranjang');
             }
         } catch (\Exception $e) {
             DB::rollBack();
 
             if ($request->has('requests')) {
-                return response()->json(['error' => 'Failed to add items to cart: ' . $e->getMessage()], 500);
+                return response()->json(['error' => 'Failed to add items to cart: '.$e->getMessage()], 500);
             } else {
-                return redirect()->back()->with('error', 'Failed to add item to cart: ' . $e->getMessage());
+                return redirect()->back()->with('error', 'Failed to add item to cart: '.$e->getMessage());
             }
         }
     }
@@ -377,6 +377,7 @@ class SendStockDraftController extends Controller
             $cart = SendStockCart::find($id);
             if ($cart) {
                 $cart->delete();
+
                 return redirect()->back()->with('success', 'Item berhasil dihapus dari keranjang');
             }
 
@@ -387,6 +388,7 @@ class SendStockDraftController extends Controller
                 $sendStock = SendStock::find($detail->send_stock_id);
                 if ($sendStock && $sendStock->status === 'draft') {
                     $detail->delete();
+
                     return redirect()->back()->with('success', 'Item berhasil dihapus dari draft');
                 } else {
                     return redirect()->back()->with('error', 'Tidak dapat menghapus item dari transaksi yang sudah selesai');
@@ -395,7 +397,7 @@ class SendStockDraftController extends Controller
 
             return redirect()->back()->with('error', 'Item tidak ditemukan');
         } catch (\Exception $e) {
-            return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
         }
     }
 
@@ -413,8 +415,8 @@ class SendStockDraftController extends Controller
             'success' => true,
             'message' => 'Quantity updated successfully',
             'data' => [
-                'quantity' => $cart->quantity
-            ]
+                'quantity' => $cart->quantity,
+            ],
         ]);
     }
 
@@ -461,14 +463,16 @@ class SendStockDraftController extends Controller
                 }
 
                 DB::commit();
+
                 return response()->json(['success' => 'Items added to draft successfully.'], 200);
             } else {
                 // Handle single item (original format)
                 $productId = $request->product_id;
                 $product = Product::find($productId);
 
-                if (!$product) {
+                if (! $product) {
                     DB::rollBack();
+
                     return redirect()->back()->with('error', 'Product not found');
                 }
 
@@ -486,15 +490,16 @@ class SendStockDraftController extends Controller
                 }
 
                 DB::commit();
+
                 return redirect()->back()->with('success', 'Produk berhasil ditambahkan ke draft');
             }
         } catch (\Exception $e) {
             DB::rollBack();
 
             if ($request->has('requests')) {
-                return response()->json(['error' => 'Failed to add items to draft: ' . $e->getMessage()], 500);
+                return response()->json(['error' => 'Failed to add items to draft: '.$e->getMessage()], 500);
             } else {
-                return redirect()->back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+                return redirect()->back()->with('error', 'Terjadi kesalahan: '.$e->getMessage());
             }
         }
     }
