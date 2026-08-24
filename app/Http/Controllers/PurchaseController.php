@@ -474,19 +474,6 @@ class PurchaseController extends Controller
         // Only get suppliers for the dropdown
         $suppliers = Supplier::select('id', 'name')->orderBy('name', 'asc')->get();
 
-        // Get all active products with their units
-        $products = Product::select(
-            'id',
-            'name',
-            'price_sell_dus',
-            'unit_dus',
-            'unit_pak',
-            'unit_eceran'
-        )
-            ->where('isShow', true)
-            ->orderBy('name', 'asc')
-            ->get();
-
         // Get all units for the select dropdowns
         $units = Unit::select('id', 'name')->orderBy('name', 'asc')->get();
 
@@ -495,7 +482,7 @@ class PurchaseController extends Controller
             return [$unit->id => $unit->name];
         });
 
-        return view('pages.purchase.edit', compact('purchase', 'suppliers', 'products', 'unitOptions'));
+        return view('pages.purchase.edit', compact('purchase', 'suppliers', 'unitOptions'));
     }
 
     /**

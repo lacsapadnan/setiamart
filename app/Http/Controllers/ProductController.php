@@ -80,6 +80,52 @@ class ProductController extends Controller
         return response()->json($response);
     }
 
+    public function select2Search(Request $request)
+    {
+        $term = trim((string) $request->input('q', ''));
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = 30;
+
+        $query = Product::query()
+            ->select('id', 'name', 'price_sell_dus', 'unit_dus', 'unit_pak', 'unit_eceran')
+            ->where('isShow', true)
+            ->orderBy('name');
+
+        if ($term !== '') {
+            $query->where(function ($innerQuery) use ($term) {
+                $innerQuery
+                    ->where('name', 'LIKE', '%'.$term.'%')
+                    ->orWhere('barcode_dus', 'LIKE', '%'.$term.'%')
+                    ->orWhere('barcode_pak', 'LIKE', '%'.$term.'%')
+                    ->orWhere('barcode_eceran', 'LIKE', '%'.$term.'%');
+            });
+        }
+
+        $products = $query
+            ->skip(($page - 1) * $perPage)
+            ->take($perPage + 1)
+            ->get();
+
+        $hasMore = $products->count() > $perPage;
+        $products = $products->take($perPage);
+
+        return response()->json([
+            'results' => $products->map(function (Product $product) {
+                return [
+                    'id' => $product->id,
+                    'text' => $product->name,
+                    'unit_dus' => $product->unit_dus,
+                    'unit_pak' => $product->unit_pak,
+                    'unit_eceran' => $product->unit_eceran,
+                    'price_sell_dus' => $product->price_sell_dus,
+                ];
+            })->values(),
+            'pagination' => [
+                'more' => $hasMore,
+            ],
+        ]);
+    }
+
     /**
      * Show the form for creating a new resource.
      */

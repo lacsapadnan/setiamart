@@ -63,14 +63,14 @@
                                 <select class="form-select product-select" name="product_id[]" data-control="select2"
                                     data-placeholder="Pilih Produk" data-allow-clear="true" data-row="{{ $key }}">
                                     <option></option>
-                                    @foreach ($products as $product)
-                                    <option value="{{ $product->id }}" data-unit-dus="{{ $product->unit_dus }}"
-                                        data-unit-pak="{{ $product->unit_pak }}"
-                                        data-unit-eceran="{{ $product->unit_eceran }}" {{ $product->id ==
-                                        $purchase_detail->product_id ? 'selected' : '' }}>
-                                        {{ $product->name }}
+                                    @if ($purchase_detail->product)
+                                    <option value="{{ $purchase_detail->product->id }}"
+                                        data-unit-dus="{{ $purchase_detail->product->unit_dus }}"
+                                        data-unit-pak="{{ $purchase_detail->product->unit_pak }}"
+                                        data-unit-eceran="{{ $purchase_detail->product->unit_eceran }}" selected>
+                                        {{ $purchase_detail->product->name }}
                                     </option>
-                                    @endforeach
+                                    @endif
                                 </select>
                             </td>
                             <td>
@@ -104,7 +104,7 @@
                             <td>
                                 <input type="text" name="price_sell_dus[]" class="form-control price-input"
                                     placeholder="0"
-                                    value="{{ number_format($purchase_detail->product->price_sell_dus, 0, ',', '.') }}" />
+                                    value="{{ number_format($purchase_detail->product->price_sell_dus ?? 0, 0, ',', '.') }}" />
                             </td>
                         </tr>
                         @endforeach
@@ -118,73 +118,88 @@
 @endsection
 @push('addon-script')
 <script type="text/javascript">
-    $(document).ready(function() {
-        // Initialize Select2 for all dropdowns
-        initializeSelect2();
+    const unitOptions = @json($unitOptions);
 
-        // Format price inputs with debounce for better performance
+    $(document).ready(function() {
+        initializeSelect2();
         setupPriceFormatting();
 
-        // Handle product change events
         $('.product-select').on('change', function() {
-            const row = $(this).data('row');
-            const selectedOption = $(this).find('option:selected');
-
-            // Get unit IDs from data attributes
-            const unitDus = selectedOption.data('unit-dus');
-            const unitPak = selectedOption.data('unit-pak');
-            const unitEceran = selectedOption.data('unit-eceran');
-
-            // Get the unit select in the same row
+            const $select = $(this);
+            const row = $select.data('row');
+            const selectedData = getSelectedProductData($select);
             const unitSelect = $(`.unit-select[data-row="${row}"]`);
 
-            // Clear and disable unit select if no product selected
-            if (!selectedOption.val()) {
+            if (!selectedData.id) {
                 unitSelect.val(null).trigger('change');
                 unitSelect.prop('disabled', true);
                 return;
             }
 
-            // Enable unit select
             unitSelect.prop('disabled', false);
-
-            // Store current selection
             const currentUnit = unitSelect.val();
-
-            // Clear existing options
             unitSelect.empty();
-
-            // Add empty option
             unitSelect.append(new Option('', '', false, false));
 
-            // Add available units from unitOptions
-            @foreach ($unitOptions as $unitId => $unitName)
-                if ([unitDus, unitPak, unitEceran].includes({{ $unitId }})) {
-                    const option = new Option('{{ $unitName }}', {{ $unitId }}, false, {{ $unitId }} == currentUnit);
-                    unitSelect.append(option);
+            Object.entries(unitOptions).forEach(([unitId, unitName]) => {
+                const numericUnitId = Number(unitId);
+                if ([selectedData.unitDus, selectedData.unitPak, selectedData.unitEceran].includes(numericUnitId)) {
+                    unitSelect.append(new Option(unitName, numericUnitId, false, numericUnitId == currentUnit));
                 }
-            @endforeach
+            });
 
-            // Trigger change event to refresh Select2
             unitSelect.trigger('change');
         });
 
-        // Trigger initial product change events to set up unit dropdowns
         $('.product-select').each(function() {
             $(this).trigger('change');
         });
     });
 
+    function getSelectedProductData($select) {
+        const select2Data = $select.select2('data')[0] || {};
+        const selectedOption = $select.find('option:selected');
+
+        return {
+            id: $select.val(),
+            unitDus: select2Data.unit_dus ?? selectedOption.data('unit-dus'),
+            unitPak: select2Data.unit_pak ?? selectedOption.data('unit-pak'),
+            unitEceran: select2Data.unit_eceran ?? selectedOption.data('unit-eceran'),
+        };
+    }
+
     function initializeSelect2() {
-        // Initialize select2 with optimized settings
-        $('.unit-select, .product-select').select2({
+        $('.unit-select').select2({
+            width: '100%',
+            placeholder: function() {
+                return $(this).data('placeholder');
+            },
+            allowClear: true,
+        });
+
+        $('.product-select').select2({
             width: '100%',
             placeholder: function() {
                 return $(this).data('placeholder');
             },
             allowClear: true,
             minimumInputLength: 0,
-            escapeMarkup: function (markup) { return markup; }
+            ajax: {
+                url: '{{ route('api.produk-select2') }}',
+                dataType: 'json',
+                delay: 250,
+                data: function(params) {
+                    return {
+                        q: params.term,
+                        page: params.page || 1
+                    };
+                },
+                processResults: function(data, params) {
+                    params.page = params.page || 1;
+                    return data;
+                },
+                cache: true
+            }
         });
     }
 

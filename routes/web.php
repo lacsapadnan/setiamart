@@ -144,6 +144,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::get('produk/api/data', [ProductController::class, 'data'])->name('api.produk');
     Route::get('kategori/api/data', [ProductController::class, 'category'])->name('api.kategori');
     Route::get('produk/api/data-search', [ProductController::class, 'dataSearch'])->name('api.produk-search');
+    Route::get('produk/api/select2', [ProductController::class, 'select2Search'])->name('api.produk-select2');
     Route::get('penjualan/api/data', [SellController::class, 'data'])->name('api.penjualan');
     Route::get('bank/api/data', [BankController::class, 'data'])->name('api.bank');
     Route::get('supplier/api/data', [SupplierController::class, 'data'])->name('api.supplier');
