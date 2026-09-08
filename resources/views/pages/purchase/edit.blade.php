@@ -104,7 +104,7 @@
                             <td>
                                 <input type="text" name="price_sell_dus[]" class="form-control price-input"
                                     placeholder="0"
-                                    value="{{ number_format($purchase_detail->product->price_sell_dus ?? 0, 0, ',', '.') }}" />
+                                    value="{{ number_format($purchase_detail->product?->price_sell_dus ?? 0, 0, ',', '.') }}" />
                             </td>
                         </tr>
                         @endforeach
