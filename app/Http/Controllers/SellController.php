@@ -201,6 +201,13 @@ class SellController extends Controller
         $transfer = (int) str_replace(',', '', $request->transfer ?? 0);
         $cash = (int) str_replace(',', '', $request->cash ?? 0);
         $grandtotal = (int) preg_replace('/[,.]/', '', $request->grand_total);
+
+        // Field yang disembunyikan bisa masih terisi sisa input sebelumnya; abaikan yang tidak sesuai metode.
+        if ($request->payment_method === 'transfer') {
+            $cash = 0;
+        } elseif ($request->payment_method === 'cash') {
+            $transfer = 0;
+        }
         $pay = $transfer + $cash;
 
         if ($request->status === 'draft') {

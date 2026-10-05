@@ -124,6 +124,11 @@ class SellDraftController extends Controller
         $cash = (int) str_replace(',', '', $request->cash ?? 0);
         $change = (int) preg_replace('/[,.]/', '', $request->change ?? 0);
 
+        if ($request->payment_method === 'transfer') {
+            $cash = 0;
+        } elseif ($request->payment_method === 'cash') {
+            $transfer = 0;
+        }
         $pay = $transfer + $cash;
 
         if ($request->status == 'draft') {

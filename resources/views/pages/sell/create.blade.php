@@ -454,8 +454,10 @@
 
         if (paymentMethod === 'transfer') {
             transferDiv.style.display = 'block';
+            document.getElementById('cash').value = '';
         } else if (paymentMethod === 'cash') {
             cashDiv.style.display = 'block';
+            document.getElementById('transfer').value = '';
         } else if (paymentMethod === 'split') {
             transferDiv.style.display = 'block';
             cashDiv.style.display = 'block';
