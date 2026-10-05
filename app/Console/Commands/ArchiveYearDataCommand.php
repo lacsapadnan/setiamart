@@ -18,7 +18,6 @@ class ArchiveYearDataCommand extends Command
                             {--dump : Buat file SQL arsip di storage/app/backups}
                             {--delete : Hapus data tahun tersebut setelah (atau tanpa) dump}
                             {--force : Lewati konfirmasi interaktif}
-                            {--allow-open-balances : Izinkan hapus meski masih ada piutang/hutang}
                             {--filename= : Nama file dump opsional}
                             {--chunk=1000 : Ukuran batch delete}';
 
@@ -90,7 +89,7 @@ class ArchiveYearDataCommand extends Command
 
         $openBalances = $this->archiveYearDataService->countOpenBalances($year);
         if ($openBalances['piutang'] > 0 || $openBalances['hutang'] > 0) {
-            $this->warn("Open balances in {$year}: piutang={$openBalances['piutang']}, hutang={$openBalances['hutang']}");
+            $this->warn("Open balances in {$year}: piutang={$openBalances['piutang']}, hutang={$openBalances['hutang']} (dilewati, tidak dihapus)");
         }
 
         $shouldDump = (bool) $this->option('dump');
@@ -126,12 +125,6 @@ class ArchiveYearDataCommand extends Command
             $this->info('Tidak ada data untuk dihapus.');
 
             return self::SUCCESS;
-        }
-
-        if (($openBalances['piutang'] > 0 || $openBalances['hutang'] > 0) && ! $this->option('allow-open-balances')) {
-            $this->error('Masih ada piutang/hutang di tahun tersebut. Lunasi dulu, atau tambahkan --allow-open-balances.');
-
-            return self::FAILURE;
         }
 
         if (! $shouldDump && ! $this->option('force')) {

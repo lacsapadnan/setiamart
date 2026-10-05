@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Services\ArchiveYearDataService;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ArchiveYearDataCommandTest extends TestCase
@@ -84,6 +85,30 @@ class ArchiveYearDataCommandTest extends TestCase
         $this->assertTrue($tables->search('purchase_details') < $tables->search('purchases'));
         $this->assertTrue($tables->search('send_stock_details') < $tables->search('send_stocks'));
         $this->assertTrue($tables->search('settlements') < $tables->search('treasury_mutations'));
+    }
+
+    public function test_purge_filter_skips_open_balances_and_their_children(): void
+    {
+        $service = new ArchiveYearDataService;
+        [$start, $end] = $service->dateRange(2023);
+        $filter = new \ReflectionMethod($service, 'applyYearFilter');
+
+        $sqlFor = function (string $table) use ($service, $filter, $start, $end): string {
+            $definition = collect($service->tables())->firstWhere('table', $table);
+            $query = DB::table($table);
+            $filter->invoke($service, $query, $definition, $start, $end);
+
+            return $query->toSql();
+        };
+
+        $this->assertStringContainsString('"status" != ?', str_replace('`', '"', $sqlFor('sells')));
+        $this->assertStringContainsString('status', $sqlFor('sell_details'));
+        $this->assertStringContainsString('status', $sqlFor('purchase_details'));
+        $this->assertStringContainsString('status', $sqlFor('sell_returs'));
+        $this->assertStringContainsString('status', $sqlFor('sell_retur_details'));
+        $this->assertStringContainsString('not exists', strtolower($sqlFor('product_reports')));
+        $this->assertStringContainsString('not exists', strtolower($sqlFor('cashflows')));
+        $this->assertStringNotContainsString('not exists', strtolower($sqlFor('activity_log')));
     }
 
     public function test_delete_without_dump_requires_force(): void

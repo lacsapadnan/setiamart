@@ -589,6 +589,7 @@ class ArchiveYearDataService
                     ->from($via['parent'])
                     ->where($via['parent_date'], '>=', $start)
                     ->where($via['parent_date'], '<', $end);
+                $this->excludeOpenBalances($sub, $via['parent'], $start, $end);
             });
 
             return;
@@ -597,6 +598,46 @@ class ArchiveYearDataService
         $dateColumn = $definition['date_column'] ?? 'created_at';
         $query->where($dateColumn, '>=', $start)
             ->where($dateColumn, '<', $end);
+        $this->excludeOpenBalances($query, $definition['table'], $start, $end);
+    }
+
+    /**
+     * Keep piutang/hutang (and rows tied to them) out of the purge. Dump is unaffected.
+     *
+     * @param  Builder  $query
+     */
+    private function excludeOpenBalances($query, string $table, Carbon $start, Carbon $end): void
+    {
+        match ($table) {
+            'cashflows', 'product_reports' => $this->excludeRowsMentioningOpenOrders($query, $table, $start, $end),
+            'sells' => $query->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'piutang')),
+            'purchases' => $query->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'hutang')),
+            'sell_returs' => $query->where(fn ($q) => $q->whereNull('sell_id')->orWhereNotIn(
+                'sell_id',
+                fn ($sub) => $sub->select('id')->from('sells')->where('status', 'piutang')
+            )),
+            default => null,
+        };
+    }
+
+    /**
+     * cashflows/product_reports have no FK to sells/purchases; they only mention the
+     * order number in `description`, so match on that for open piutang/hutang of the year.
+     *
+     * @param  Builder  $query
+     */
+    private function excludeRowsMentioningOpenOrders($query, string $table, Carbon $start, Carbon $end): void
+    {
+        foreach ([['sells', 'piutang'], ['purchases', 'hutang']] as [$orderTable, $openStatus]) {
+            $query->whereNotExists(function ($sub) use ($table, $orderTable, $openStatus, $start, $end) {
+                $sub->selectRaw('1')
+                    ->from($orderTable.' as o')
+                    ->where('o.status', $openStatus)
+                    ->where('o.created_at', '>=', $start)
+                    ->where('o.created_at', '<', $end)
+                    ->whereRaw("{$table}.description LIKE CONCAT('%', o.order_number, '%')");
+            });
+        }
     }
 
     /**
