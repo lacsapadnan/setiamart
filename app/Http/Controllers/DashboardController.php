@@ -32,6 +32,9 @@ class DashboardController extends Controller
         $cacheKey = $warehouseId === 'all' ? 'top_products_all' : "top_products_$warehouseId";
 
         $topProducts = Cache::remember($cacheKey, 600, function () use ($warehouseId) {
+            // Dibatasi 90 hari agar sells dipindai lewat index created_at (seluruh riwayat ±68 dtk, 90 hari ±1 dtk).
+            $since = now()->subDays(90)->startOfDay();
+
             if ($warehouseId !== 'all') {
                 // Query for specific warehouse
                 return DB::table('sell_details')
@@ -49,6 +52,7 @@ class DashboardController extends Controller
                     ->join('products', 'sell_details.product_id', '=', 'products.id')
                     ->where('sells.warehouse_id', $warehouseId)
                     ->where('sells.status', '!=', 'batal')
+                    ->where('sells.created_at', '>=', $since)
                     ->groupBy('sell_details.product_id', 'products.name')
                     ->orderByDesc('total_sold')
                     ->limit(10)
@@ -71,6 +75,7 @@ class DashboardController extends Controller
                     ->join('products', 'sell_details.product_id', '=', 'products.id')
                     ->join('warehouses', 'sells.warehouse_id', '=', 'warehouses.id')
                     ->where('sells.status', '!=', 'batal')
+                    ->where('sells.created_at', '>=', $since)
                     ->groupBy('sell_details.product_id', 'products.name')
                     ->orderByDesc('total_sold')
                     ->limit(10)

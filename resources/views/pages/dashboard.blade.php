@@ -13,7 +13,7 @@
 <div class="mt-5">
     <div class="card">
         <div class="card-header">
-            <h3 class="card-title">Top 10 Produk Terlaris</h3>
+            <h3 class="card-title">Top 10 Produk Terlaris (90 Hari Terakhir)</h3>
             @if ($isMaster)
             <div class="card-toolbar">
                 <form method="GET" action="{{ route('dashboard') }}" class="d-flex align-items-center">
