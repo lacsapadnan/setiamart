@@ -4,20 +4,18 @@ namespace App\Exports;
 
 use App\Models\Product;
 use Illuminate\Support\Facades\Schema;
-use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 
-class ProductExport implements FromCollection, WithHeadings
+class ProductExport implements FromQuery, WithHeadings
 {
-    /**
-     * @return \Illuminate\Support\Collection
-     */
-    public function collection()
+    // FromQuery: dibaca per chunk (excel.exports.chunk_size), bukan seluruh produk sekaligus.
+    public function query()
     {
         return Product::select(array_diff(
             Schema::getColumnListing('products'),
             ['created_at', 'updated_at']
-        ))->get();
+        ))->orderBy('id');
     }
 
     /**

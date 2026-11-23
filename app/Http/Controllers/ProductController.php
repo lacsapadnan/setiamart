@@ -260,6 +260,9 @@ class ProductController extends Controller
 
     public function export()
     {
+        // shortcut: xlsx ditulis PhpSpreadsheet di memori (~120MB untuk ±6.5k produk), naikkan batas dulu; pindah ke queued export / CSV kalau produk terus bertambah.
+        ini_set('memory_limit', '256M');
+
         $date = date('Y-m-d');
         $filename = "export_product_{$date}.xlsx";
 
