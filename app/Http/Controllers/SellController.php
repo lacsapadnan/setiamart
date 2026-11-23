@@ -3,29 +3,27 @@
 namespace App\Http\Controllers;
 
 use App\Exports\SalesExport;
+use App\Http\Requests\SellPayCreditRequest;
+use App\Http\Requests\SellUpdateCartQuantityRequest;
 use App\Models\Customer;
 use App\Models\Inventory;
 use App\Models\PaymentSetting;
 use App\Models\Product;
-use App\Models\ProductReport;
 use App\Models\Sell;
 use App\Models\SellCart;
-use App\Models\SellCartDraft;
 use App\Models\SellDetail;
 use App\Models\SellRetur;
-use App\Models\Unit;
 use App\Models\User;
 use App\Models\Warehouse;
-use App\Services\CashflowService;
-use App\Support\SalePaymentMethodResolver;
+use App\Services\SellCartService;
+use App\Services\SellCreditService;
+use App\Services\SellQueryService;
+use App\Services\SellService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
-use DataTables;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Response;
-use InvalidArgumentException;
 use Maatwebsite\Excel\Facades\Excel;
 use Mike42\Escpos\EscposImage;
 use Mike42\Escpos\PrintConnectors\FilePrintConnector;
@@ -33,12 +31,12 @@ use Mike42\Escpos\Printer;
 
 class SellController extends Controller
 {
-    protected $cashflowService;
-
-    public function __construct(CashflowService $cashflowService)
-    {
-        $this->cashflowService = $cashflowService;
-    }
+    public function __construct(
+        protected SellService $sellService,
+        protected SellCartService $cartService,
+        protected SellCreditService $creditService,
+        protected SellQueryService $queryService,
+    ) {}
 
     /**
      * Display a listing of the resource.
@@ -54,82 +52,21 @@ class SellController extends Controller
 
     public function data(Request $request)
     {
-        try {
-            $role = auth()->user()->getRoleNames();
-            $user_id = $request->input('user_id');
-            $fromDate = $request->input('from_date') ?? date('Y-m-d');
-            $toDate = $request->input('to_date') ?? date('Y-m-d');
-            $warehouse = $request->input('warehouse');
-            $export = $request->input('export');
-            $search = $request->input('search');
+        $user = auth()->user();
+        $isMaster = $user->getRoleNames()[0] === 'master';
 
-            $query = Sell::with([
-                'warehouse',
-                'customer',
-                'cashier',
-                'details.product.unit_dus',
-                'details.product.unit_pak',
-                'details.product.unit_eceran',
-                'details' => function ($query) {
-                    $query->whereNotNull('unit_id');
-                },
-                'details.unit',
-            ])
-                ->where('status', '!=', 'draft')
-                ->orderBy('id', 'desc');
-
-            if ($role[0] !== 'master') {
-                $query->where('warehouse_id', auth()->user()->warehouse_id)
-                    ->where('cashier_id', auth()->id());
-            }
-
-            if ($warehouse) {
-                $query->where('warehouse_id', $warehouse);
-            }
-
-            if ($user_id) {
-                $query->where('cashier_id', $user_id);
-            }
-
-            if ($fromDate && $toDate) {
-                $endDate = Carbon::parse($toDate)->endOfDay();
-                $query->whereBetween('created_at', [$fromDate, $endDate]);
-            }
-
-            if (! empty($search) && ! empty($search['value'])) {
-                $searchValue = $search['value'];
-                $query->where(function ($q) use ($searchValue) {
-                    $q->where('order_number', 'like', "%{$searchValue}%")
-                        ->orWhereHas('customer', function ($q) use ($searchValue) {
-                            $q->where('name', 'like', "%{$searchValue}%");
-                        })
-                        ->orWhereHas('warehouse', function ($q) use ($searchValue) {
-                            $q->where('name', 'like', "%{$searchValue}%");
-                        })
-                        ->orWhereHas('cashier', function ($q) use ($searchValue) {
-                            $q->where('name', 'like', "%{$searchValue}%");
-                        })
-                        ->orWhere('payment_method', 'like', "%{$searchValue}%")
-                        ->orWhere('status', 'like', "%{$searchValue}%");
-                });
-            }
-
-            return DataTables::of($query)
-                ->make(true);
-        } catch (\Throwable $e) {
-            report($e);
-            Log::error('SellController data method error: '.$e->getMessage(), [
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
-                'request_data' => $request->all(),
-            ]);
-
-            return response()->json([
-                'error' => true,
-                'message' => 'Terjadi kesalahan saat mengambil data penjualan.',
-            ], 500);
-        }
+        return $this->queryService->data(
+            [
+                'user_id' => $request->input('user_id'),
+                'from_date' => $request->input('from_date') ?? date('Y-m-d'),
+                'to_date' => $request->input('to_date') ?? date('Y-m-d'),
+                'warehouse' => $request->input('warehouse'),
+                'search' => $request->input('search'),
+            ],
+            $isMaster,
+            $user->id,
+            $user->warehouse_id,
+        );
     }
 
     /**
@@ -191,209 +128,35 @@ class SellController extends Controller
      */
     public function store(Request $request)
     {
-        $sellCart = SellCart::with(['product', 'unit'])->where('cashier_id', auth()->id())->get();
+        $result = $this->sellService->store($request->all());
 
-        // Validate cart has items if not a draft
-        if ($sellCart->isEmpty() && $request->status !== 'draft') {
-            return redirect()->back()->withInput()->withErrors('Keranjang penjualan kosong');
-        }
-
-        $transfer = (int) str_replace(',', '', $request->transfer ?? 0);
-        $cash = (int) str_replace(',', '', $request->cash ?? 0);
-        $grandtotal = (int) preg_replace('/[,.]/', '', $request->grand_total);
-
-        // Field yang disembunyikan bisa masih terisi sisa input sebelumnya; abaikan yang tidak sesuai metode.
-        if ($request->payment_method === 'transfer') {
-            $cash = 0;
-        } elseif ($request->payment_method === 'cash') {
-            $transfer = 0;
-        }
-        $pay = $transfer + $cash;
-
-        if ($request->status === 'draft') {
-            $status = 'draft';
-        } elseif ($pay < $grandtotal) {
-            $status = 'piutang';
-        } else {
-            $status = 'lunas';
-        }
-
-        if ($status === 'piutang') {
-            $authorizedAt = session('piutang_authorization');
-            if (! $authorizedAt || now()->timestamp - $authorizedAt > 300) {
-                return redirect()->back()->withInput()
-                    ->withErrors('Transaksi piutang memerlukan otorisasi password user master.');
+        if (! $result['ok']) {
+            $redirect = redirect()->back();
+            if ($result['with_input'] ?? false) {
+                $redirect = $redirect->withInput();
             }
-            session()->forget(['piutang_authorization', 'piutang_authorized_by']);
+
+            return $redirect->withErrors($result['error']);
         }
 
-        $grandTotalValid = 0;
-        foreach ($sellCart as $sc) {
-            $grandTotalValid += (int) preg_replace('/[,.]/', '', ($sc->price * $sc->quantity) - $sc->diskon);
-        }
-
-        if ($grandtotal !== $grandTotalValid) {
-            return redirect()->back()->withInput()->withErrors('Terjadi Kesalahan Kalkulasi Total');
+        if ($result['type'] === 'draft') {
+            return redirect()->route('penjualan.index');
         }
 
         try {
-            DB::beginTransaction();
+            // Add a small delay to ensure database operations are fully committed
+            sleep(1);
 
-            $rawPaymentMethod = $request->input('payment_method');
-            $paymentMethod = SalePaymentMethodResolver::resolve(
-                is_string($rawPaymentMethod) ? $rawPaymentMethod : null,
-                $cash,
-                $transfer
-            );
+            $printUrl = route('penjualan.print', $result['sell_id']);
+            $script = "<script>
+                setTimeout(function() {
+                    window.open('$printUrl', '_blank');
+                }, 500);
+            </script>";
 
-            if ($request->status !== 'draft' && $pay > 0 && $paymentMethod === null) {
-                throw new InvalidArgumentException('Metode pembayaran tidak dapat ditentukan untuk jurnal kas.');
-            }
-
-            $sell = Sell::create([
-                'cashier_id' => auth()->id(),
-                'warehouse_id' => auth()->user()->warehouse_id,
-                'order_number' => $request->order_number,
-                'customer_id' => $request->customer,
-                'subtotal' => preg_replace('/[,.]/', '', $request->subtotal),
-                'grand_total' => preg_replace('/[,.]/', '', $request->grand_total),
-                'cash' => preg_replace('/[,.]/', '', $cash),
-                'transfer' => preg_replace('/[,.]/', '', $transfer),
-                'pay' => preg_replace('/[,.]/', '', $pay),
-                'change' => preg_replace('/[,.]/', '', $request->change ?? 0),
-                'transaction_date' => Carbon::createFromFormat('d/m/Y', $request->transaction_date)->format('Y-m-d'),
-                'payment_method' => $paymentMethod,
-                'status' => $status,
-            ]);
-
-            $customer = Customer::find($request->customer);
-
-            if ($request->status == 'draft') {
-                $draftData = [];
-                foreach ($sellCart as $sc) {
-                    $draftData[] = [
-                        'sell_id' => $sell->id,
-                        'cashier_id' => auth()->id(),
-                        'product_id' => $sc->product_id,
-                        'unit_id' => $sc->unit_id,
-                        'quantity' => $sc->quantity,
-                        'price' => $sc->price,
-                        'diskon' => $sc->diskon,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                }
-                SellCartDraft::insert($draftData);
-
-                // Clear the cart after creating draft
-                SellCart::where('cashier_id', auth()->id())->delete();
-            } else {
-                // Prepare bulk insert data for sell details and product reports
-                $sellDetailsData = [];
-                $productReportsData = [];
-                $now = now();
-
-                foreach ($sellCart as $sc) {
-                    // Prepare sell details data
-                    $sellDetailsData[] = [
-                        'sell_id' => $sell->id,
-                        'product_id' => $sc->product_id,
-                        'unit_id' => $sc->unit_id,
-                        'quantity' => $sc->quantity,
-                        'price' => $sc->price,
-                        'diskon' => $sc->diskon,
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ];
-
-                    // Use already loaded relationships from eager loading
-                    $unit = $sc->unit;
-                    $product = $sc->product;
-
-                    if ($sc->unit_id == $product->unit_dus) {
-                        $unitType = 'DUS';
-                    } elseif ($sc->unit_id == $product->unit_pak) {
-                        $unitType = 'PAK';
-                    } elseif ($sc->unit_id == $product->unit_eceran) {
-                        $unitType = 'ECERAN';
-                    }
-
-                    // Prepare product reports data
-                    $productReportsData[] = [
-                        'product_id' => $sc->product_id,
-                        'warehouse_id' => auth()->user()->warehouse_id,
-                        'user_id' => auth()->id(),
-                        'customer_id' => $request->customer,
-                        'unit' => $unit->name,
-                        'unit_type' => $unitType,
-                        'qty' => $sc->quantity,
-                        'price' => ($sc->price * $sc->quantity) - $sc->diskon,
-                        'for' => 'KELUAR',
-                        'type' => 'PENJUALAN',
-                        'description' => 'Penjualan '.$sell->order_number,
-                        'created_at' => $now,
-                        'updated_at' => $now,
-                    ];
-                }
-
-                // Bulk insert sell details
-                SellDetail::insert($sellDetailsData);
-
-                // Bulk insert product reports
-                ProductReport::insert($productReportsData);
-
-                if ($pay > 0) {
-                    $this->cashflowService->handleSalePayment(
-                        warehouseId: auth()->user()->warehouse_id,
-                        orderNumber: $sell->order_number,
-                        customerName: $customer->name,
-                        paymentMethod: $paymentMethod,
-                        cash: $cash,
-                        transfer: $transfer,
-                        change: $sell->change
-                    );
-                }
-
-                // Move cart deletion to end of transaction
-                SellCart::where('cashier_id', auth()->id())->delete();
-            }
-
-            DB::commit();
-
-            // Verify sell details were created if not a draft
-            if ($request->status !== 'draft') {
-                $detailCount = SellDetail::where('sell_id', $sell->id)->count();
-                if ($detailCount === 0) {
-                    return redirect()->back()->withInput()
-                        ->withErrors('Terjadi kesalahan: Detail penjualan tidak tersimpan');
-                }
-            }
-
-            if ($request->status != 'draft') {
-                try {
-                    // Add a small delay to ensure database operations are fully committed
-                    sleep(1);
-
-                    $printUrl = route('penjualan.print', $sell->id);
-                    $script = "<script>
-                        setTimeout(function() {
-                            window.open('$printUrl', '_blank');
-                        }, 500);
-                    </script>";
-
-                    return Response::make($script.'<script>setTimeout(function() { window.location.href = "'.route('penjualan.index').'"; }, 1000);</script>');
-                } catch (\Throwable $th) {
-                    return redirect()->route('penjualan.index')->withErrors('Transaksi berhasil disimpan, tetapi gagal mencetak struk');
-                }
-            } else {
-                return redirect()->route('penjualan.index');
-            }
-        } catch (\Exception $e) {
-            DB::rollBack();
-            report($e);
-
-            return redirect()->back()->withInput()
-                ->withErrors('Terjadi kesalahan saat menyimpan transaksi.');
+            return Response::make($script.'<script>setTimeout(function() { window.location.href = "'.route('penjualan.index').'"; }, 1000);</script>');
+        } catch (\Throwable $th) {
+            return redirect()->route('penjualan.index')->withErrors('Transaksi berhasil disimpan, tetapi gagal mencetak struk');
         }
     }
 
@@ -554,227 +317,58 @@ class SellController extends Controller
      */
     public function destroy(string $id)
     {
-        $sell = Sell::find($id);
+        $result = $this->sellService->destroy($id);
 
-        if (! $sell) {
+        if (! $result['ok']) {
             if (request()->ajax()) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Data penjualan tidak ditemukan',
-                ], 404);
+                    'message' => $result['message'],
+                ], $result['status']);
             }
 
-            return redirect()->back()->with('error', 'Data penjualan tidak ditemukan');
+            return redirect()->back()->with('error', $result['message']);
         }
-
-        // Delete the sell record
-        $sell->delete();
-
-        $message = 'Data penjualan berhasil dihapus';
 
         // For AJAX requests, return JSON to avoid redirect method-mismatch issues
         if (request()->ajax()) {
             return response()->json([
                 'status' => 'success',
-                'message' => $message,
+                'message' => $result['message'],
             ]);
         }
 
-        return redirect()->back()->with('success', $message);
+        return redirect()->back()->with('success', $result['message']);
     }
 
     public function addCart(Request $request)
     {
-        // $inputRequests = $request->input('requests');
-        $requests = $request->input('requests');
+        $result = $this->cartService->addCart($request->input('requests', []));
 
-        try {
-            DB::beginTransaction();
-
-            foreach ($requests as $inputRequest) {
-                $productId = $inputRequest['product_id'];
-                $product = Product::find($productId);
-
-                if (! $product) {
-                    DB::rollBack();
-
-                    return response()->json(['errors' => ['Produk tidak ditemukan.']], 422);
-                }
-
-                // Process quantity_dus if it exists
-                if (isset($inputRequest['quantity_dus']) && $inputRequest['quantity_dus']) {
-                    $validationError = $this->validateSellPriceInput($inputRequest['price_dus'] ?? null, $product->name, 'dus');
-                    if ($validationError !== null) {
-                        DB::rollBack();
-
-                        return response()->json(['errors' => [$validationError]], 422);
-                    }
-                    $this->processCartItem($productId, $inputRequest['quantity_dus'], $inputRequest['unit_dus'], $inputRequest['price_dus'], $inputRequest['diskon_dus'] ?? 0);
-                    $this->decreaseInventory($productId, $inputRequest['quantity_dus'], $inputRequest['unit_dus']);
-                }
-
-                // Process quantity_pak if it exists
-                if (isset($inputRequest['quantity_pak']) && $inputRequest['quantity_pak']) {
-                    $validationError = $this->validateSellPriceInput($inputRequest['price_pak'] ?? null, $product->name, 'pak');
-                    if ($validationError !== null) {
-                        DB::rollBack();
-
-                        return response()->json(['errors' => [$validationError]], 422);
-                    }
-                    $this->processCartItem($productId, $inputRequest['quantity_pak'], $inputRequest['unit_pak'], $inputRequest['price_pak'], $inputRequest['diskon_pak'] ?? 0);
-                    $this->decreaseInventory($productId, $inputRequest['quantity_pak'], $inputRequest['unit_pak']);
-                }
-
-                // Process quantity_eceran if it exists
-                if (isset($inputRequest['quantity_eceran']) && $inputRequest['quantity_eceran']) {
-                    $validationError = $this->validateSellPriceInput($inputRequest['price_eceran'] ?? null, $product->name, 'eceran');
-                    if ($validationError !== null) {
-                        DB::rollBack();
-
-                        return response()->json(['errors' => [$validationError]], 422);
-                    }
-                    $this->processCartItem($productId, $inputRequest['quantity_eceran'], $inputRequest['unit_eceran'], $inputRequest['price_eceran'], $inputRequest['diskon_eceran'] ?? 0);
-                    $this->decreaseInventory($productId, $inputRequest['quantity_eceran'], $inputRequest['unit_eceran']);
-                }
+        if (! $result['ok']) {
+            if (isset($result['errors'])) {
+                return response()->json(['errors' => $result['errors']], $result['status']);
             }
 
-            DB::commit();
-        } catch (\Exception $e) {
-            DB::rollBack();
-
-            return response()->json(['error' => 'Failed to add items to cart.'], 500);
+            return response()->json(['error' => $result['error']], $result['status']);
         }
 
         return response()->json(['success' => 'Items added to cart successfully.'], 200);
     }
 
-    private function validateSellPriceInput($priceInput, string $productName, string $unitName): ?string
-    {
-        $normalizedPrice = $this->normalizeSellPriceInput($priceInput);
-        if ($normalizedPrice === null || $normalizedPrice <= 0) {
-            return "Harga jual produk {$productName} ({$unitName}) harus lebih dari 0.";
-        }
-
-        return null;
-    }
-
-    private function normalizeSellPriceInput($priceInput): ?float
-    {
-        if ($priceInput === null || $priceInput === '') {
-            return null;
-        }
-
-        $normalizedPrice = str_replace(',', '', (string) $priceInput);
-        if (! is_numeric($normalizedPrice)) {
-            return null;
-        }
-
-        return (float) $normalizedPrice;
-    }
-
-    private function processCartItem($productId, $quantity, $unitId, $price, $discount)
-    {
-        // Cast to numeric types to support decimal quantity input
-        $quantity = round((float) $quantity, 2);
-        $price = (float) str_replace(',', '', $price); // Remove commas if present
-        $discount = (float) str_replace(',', '', $discount);
-
-        // Calculate the total price based on the unit price and quantity
-        $totalPrice = $price * $quantity;
-
-        // Apply the discount to the total price if the discount is provided
-        if ($discount > 0) {
-            $totalPrice -= $discount;
-        }
-
-        $existingCart = SellCart::where('cashier_id', auth()->id())
-            ->where('product_id', $productId)
-            ->where('unit_id', $unitId)
-            ->first();
-
-        if ($existingCart) {
-            $existingCart->quantity = round((float) $existingCart->quantity + $quantity, 2);
-            $existingCart->save();
-        } else {
-            SellCart::create([
-                'cashier_id' => auth()->id(),
-                'product_id' => $productId,
-                'unit_id' => $unitId,
-                'quantity' => $quantity,
-                'price' => $price,
-                'diskon' => $discount,
-            ]);
-        }
-    }
-
-    private function decreaseInventory($productId, $quantity, $unitId)
-    {
-        // Cast to float to support decimal quantity input
-        $quantity = round((float) $quantity, 2);
-
-        $product = Product::find($productId);
-        $inventory = Inventory::where('product_id', $productId)
-            ->where('warehouse_id', auth()->user()->warehouse_id)
-            ->first();
-
-        // Check if product and inventory exist
-        if (! $product || ! $inventory) {
-            return;
-        }
-
-        if ($unitId == $product->unit_dus) {
-            $inventory->quantity -= $quantity * $product->dus_to_eceran;
-        } elseif ($unitId == $product->unit_pak) {
-            $inventory->quantity -= $quantity * $product->pak_to_eceran;
-        } elseif ($unitId == $product->unit_eceran) {
-            $inventory->quantity -= $quantity;
-        }
-
-        $inventory->save();
-    }
-
     public function destroyCart(Request $request, $id)
     {
-        $sellCart = SellCart::where('product_id', $request->product_id)
-            ->where('id', $id)
-            ->first();
+        $result = $this->cartService->destroyCart($id, $request->product_id);
 
-        // Check if cart item exists
-        if (! $sellCart) {
+        if (! $result['ok']) {
             if ($request->ajax()) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Item keranjang tidak ditemukan',
-                ], 404);
+                    'message' => $result['message'],
+                ], $result['status']);
             }
 
-            return redirect()->back()->with('error', 'Item keranjang tidak ditemukan');
-        }
-
-        // Store values before deletion
-        $unitId = $sellCart->unit_id;
-        $productId = $sellCart->product_id;
-        $quantity = $sellCart->quantity;
-
-        // Delete the cart item
-        $sellCart->delete();
-
-        // Restore inventory
-        $product = Product::find($productId);
-        $inventory = Inventory::where('product_id', $productId)
-            ->where('warehouse_id', auth()->user()->warehouse_id)
-            ->first();
-
-        if ($inventory && $product) {
-            if ($unitId == $product->unit_dus) {
-                $inventory->quantity += $quantity * $product->dus_to_eceran;
-            } elseif ($unitId == $product->unit_pak) {
-                $inventory->quantity += $quantity * $product->pak_to_eceran;
-            } elseif ($unitId == $product->unit_eceran) {
-                $inventory->quantity += $quantity;
-            }
-
-            $inventory->save();
+            return redirect()->back()->with('error', $result['message']);
         }
 
         if ($request->ajax()) {
@@ -787,53 +381,14 @@ class SellController extends Controller
         return redirect()->back()->with('success', 'Item berhasil dihapus dari keranjang');
     }
 
-    public function updateCartQuantity(Request $request, $id)
+    public function updateCartQuantity(SellUpdateCartQuantityRequest $request, $id)
     {
-        $request->validate([
-            'quantity' => 'required|numeric|decimal:0,2|min:0.01',
-        ]);
-
-        $sellCart = SellCart::findOrFail($id);
-        $product = Product::find($sellCart->product_id);
-        $inventory = Inventory::where('product_id', $sellCart->product_id)
-            ->where('warehouse_id', auth()->user()->warehouse_id)
-            ->first();
-
-        // Calculate inventory adjustment
-        $oldQuantity = $sellCart->quantity;
-        $newQuantity = round((float) $request->quantity, 2);
-
-        // Restore old quantity to inventory
-        if ($sellCart->unit_id == $product->unit_dus) {
-            $inventory->quantity += $oldQuantity * $product->dus_to_eceran;
-        } elseif ($sellCart->unit_id == $product->unit_pak) {
-            $inventory->quantity += $oldQuantity * $product->pak_to_eceran;
-        } elseif ($sellCart->unit_id == $product->unit_eceran) {
-            $inventory->quantity += $oldQuantity;
-        }
-
-        // Deduct new quantity from inventory
-        if ($sellCart->unit_id == $product->unit_dus) {
-            $inventory->quantity -= $newQuantity * $product->dus_to_eceran;
-        } elseif ($sellCart->unit_id == $product->unit_pak) {
-            $inventory->quantity -= $newQuantity * $product->pak_to_eceran;
-        } elseif ($sellCart->unit_id == $product->unit_eceran) {
-            $inventory->quantity -= $newQuantity;
-        }
-
-        $inventory->save();
-
-        // Update cart quantity
-        $sellCart->quantity = $newQuantity;
-        $sellCart->save();
+        $result = $this->cartService->updateCartQuantity($id, $request->quantity);
 
         return response()->json([
             'success' => true,
             'message' => 'Quantity updated successfully',
-            'data' => [
-                'quantity' => round((float) $sellCart->quantity, 2),
-                'subtotal' => round($sellCart->price * $sellCart->quantity - $sellCart->diskon, 2),
-            ],
+            'data' => $result['data'],
         ]);
     }
 
@@ -894,125 +449,43 @@ class SellController extends Controller
 
     public function dataCredit(Request $request)
     {
-        $userRoles = auth()->user()->getRoleNames();
-        $user_id = $request->input('user_id');
-        $fromDate = $request->input('from_date');
-        $toDate = $request->input('to_date');
-        $warehouse = $request->input('warehouse');
+        $user = auth()->user();
+        $isMaster = $user->getRoleNames()[0] == 'master';
 
-        $query = Sell::with([
-            'warehouse',
-            'customer',
-            'cashier',
-            'details.product.unit_dus',
-            'details.product.unit_pak',
-            'details.product.unit_eceran',
-            'details.unit',
-        ])->where('status', 'piutang');
-
-        if ($userRoles[0] != 'master') {
-            $query->where('warehouse_id', auth()->user()->warehouse_id);
-        }
-
-        if ($warehouse) {
-            $query->where('warehouse_id', $warehouse);
-        }
-
-        if ($user_id) {
-            $query->where('cashier_id', $user_id);
-        }
-
-        if ($fromDate && $toDate) {
-            $endDate = Carbon::parse($toDate)->endOfDay();
-            $query->whereDate('created_at', '>=', $fromDate)
-                ->whereDate('created_at', '<=', $endDate);
-        }
-
-        return response()->json($query->get());
+        return response()->json($this->queryService->dataCredit(
+            [
+                'user_id' => $request->input('user_id'),
+                'from_date' => $request->input('from_date'),
+                'to_date' => $request->input('to_date'),
+                'warehouse' => $request->input('warehouse'),
+            ],
+            $isMaster,
+            $user->warehouse_id,
+        ));
     }
 
-    public function payCredit(Request $request)
+    public function payCredit(SellPayCreditRequest $request)
     {
-        $validated = $request->validate([
-            'sell_id' => 'required|integer',
-            'payment' => 'required|string',
+        $result = $this->creditService->payCredit([
+            'sell_id' => $request->validated('sell_id'),
+            'payment' => $request->validated('payment'),
+            'potongan' => $request->input('potongan'),
+            'pay' => $request->input('pay'),
+            'pay_credit_cash' => $request->input('pay_credit_cash'),
+            'pay_credit_transfer' => $request->input('pay_credit_transfer'),
+            'keterangan' => $request->input('keterangan'),
         ]);
 
-        $sell = Sell::with('customer')->find($validated['sell_id']);
-
-        if (! $sell) {
+        if (! $result['ok']) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Sale not found',
+                'message' => $result['message'],
             ]);
         }
-
-        $grandTotal = (int) preg_replace('/[,.]/', '', $sell->grand_total);
-        $currentPay = (int) preg_replace('/[,.]/', '', $sell->pay);
-        $paymentMethod = $validated['payment'];
-
-        // Initialize payment variables
-        $payment = 0;
-        $paymentCash = 0;
-        $paymentTransfer = 0;
-        $potongan = (int) preg_replace('/[,.]/', '', $request->potongan ?? 0);
-
-        if ($paymentMethod === 'split') {
-            $paymentCash = (int) preg_replace('/[,.]/', '', $request->pay_credit_cash ?? 0);
-            $paymentTransfer = (int) preg_replace('/[,.]/', '', $request->pay_credit_transfer ?? 0);
-            $payment = $paymentCash + $paymentTransfer;
-
-            // Validate split payment
-            if ($paymentCash < 0 || $paymentTransfer < 0) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Pembayaran tidak boleh kurang dari 0',
-                ]);
-            }
-        } else {
-            $payment = (int) preg_replace('/[,.]/', '', $request->pay ?? 0);
-            if ($payment <= 0) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Pembayaran tidak boleh 0 atau kurang',
-                ]);
-            }
-        }
-
-        $sisaHutang = $grandTotal - $currentPay;
-
-        // Validate total payment (payment + potongan) against remaining debt
-        if ($payment > $sisaHutang) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Total pembayaran tidak boleh lebih dari sisa piutang',
-            ]);
-        }
-
-        $sell->pay = $currentPay + $payment + $potongan;
-
-        if ($sell->pay >= $grandTotal) {
-            $sell->status = 'lunas';
-        }
-
-        $sell->save();
-
-        // Handle cashflow using service
-        $this->cashflowService->handleCreditPayment(
-            warehouseId: $sell->warehouse_id,
-            orderNumber: $sell->order_number,
-            customerName: $sell->customer->name,
-            paymentMethod: $paymentMethod,
-            payment: $payment,
-            paymentCash: $paymentCash,
-            paymentTransfer: $paymentTransfer,
-            potongan: $potongan,
-            keterangan: $request->keterangan ?? ''
-        );
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Pembayaran piutang berhasil',
+            'message' => $result['message'],
         ]);
     }
 
