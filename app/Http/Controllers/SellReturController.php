@@ -19,6 +19,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Yajra\DataTables\Facades\DataTables;
 
 class SellReturController extends Controller
 {
@@ -162,13 +163,13 @@ class SellReturController extends Controller
             $toDate = $defaultDate;
         }
 
-        if ($role[0] == 'master') {
-            $sells = Sell::with('details.product.unit_dus', 'details.product.unit_pak', 'details.product.unit_eceran', 'warehouse', 'customer')
-                ->orderBy('id', 'desc');
-        } else {
-            $sells = Sell::with('details.product.unit_dus', 'details.product.unit_pak', 'details.product.unit_eceran', 'warehouse', 'customer')
-                ->where('warehouse_id', auth()->user()->warehouse_id)
-                ->orderBy('id', 'desc');
+        // Hanya kolom yang dipakai DataTable list-penjualan (order_number, customer.name, warehouse.name, grand_total, id).
+        $sells = Sell::select('id', 'order_number', 'grand_total', 'customer_id', 'warehouse_id')
+            ->with('warehouse:id,name', 'customer:id,name')
+            ->orderBy('id', 'desc');
+
+        if ($role[0] != 'master') {
+            $sells->where('warehouse_id', auth()->user()->warehouse_id);
         }
 
         if ($warehouse) {
@@ -179,16 +180,14 @@ class SellReturController extends Controller
             $sells->where('cashier_id', $user_id);
         }
 
-        if ($fromDate && $toDate) {
-            $endDate = Carbon::parse($toDate)->endOfDay();
+        // whereBetween (bukan whereDate) supaya index created_at bisa dipakai.
+        $sells->whereBetween('created_at', [
+            Carbon::parse($fromDate)->startOfDay(),
+            Carbon::parse($toDate)->endOfDay(),
+        ]);
 
-            $sells->whereDate('created_at', '>=', $fromDate)
-                ->whereDate('created_at', '<=', $endDate);
-        }
-
-        $sells = $sells->get();
-
-        return response()->json($sells);
+        // Server-side paging: hanya satu halaman yang dimuat ke memori, berapa pun rentang tanggalnya.
+        return DataTables::of($sells)->make(true);
     }
 
     /**

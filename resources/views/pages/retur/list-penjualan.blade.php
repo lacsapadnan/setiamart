@@ -101,22 +101,24 @@
                 datatable = $(table).DataTable({
                     "info": true,
                     'processing': true,
+                    'serverSide': true,
                     'order': [],
                     'pageLength': 10,
                     "ajax": {
                         url: '{{ route('api.penjualan-retur') }}',
                         type: 'GET',
-                        dataSrc: '',
                     },
                     "dom": '<"top"lp>rt<"bottom"lp><"clear">',
                     "columns": [{
                             "data": "order_number"
                         },
                         {
-                            "data": "customer.name"
+                            "data": "customer.name",
+                            "orderable": false
                         },
                         {
-                            "data": "warehouse.name"
+                            "data": "warehouse.name",
+                            "orderable": false
                         },
                         {
                             "data": "grand_total",
