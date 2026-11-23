@@ -114,16 +114,17 @@ class InventoryController extends Controller
 
     public function dataAll(Request $request)
     {
+        $draw = $request->input('draw', 1);
         $searchQuery = $request->input('searchQuery');
+
+        // Tanpa kata kunci tidak ada hasil: langsung kembali tanpa query.
+        if (! $searchQuery) {
+            return response()->json(['draw' => $draw, 'recordsTotal' => 0, 'recordsFiltered' => 0, 'data' => []]);
+        }
 
         $query = Inventory::with('product', 'warehouse')
             ->where('warehouse_id', auth()->user()->warehouse_id)
-            ->whereHas('product', function ($query) {
-                $query->where('isShow', true);
-            });
-
-        if ($searchQuery) {
-            $query->whereHas('product', function ($query) use ($searchQuery) {
+            ->whereHas('product', function ($query) use ($searchQuery) {
                 $query->where('isShow', true)
                     ->where(function ($subQuery) use ($searchQuery) {
                         $subQuery->where('name', 'LIKE', '%'.$searchQuery.'%')
@@ -132,26 +133,21 @@ class InventoryController extends Controller
                             ->orWhere('barcode_eceran', 'LIKE', '%'.$searchQuery.'%');
                     });
             });
-        } else {
-            $query->whereRaw('1 = 0'); // Return no results when no search query is provided
-        }
 
         $recordsFiltered = $query->count();
 
-        // Apply pagination using Laravel's paginate() method
-        $pageSize = $request->input('length', 10); // Number of records per page, defaults to 10
-        $currentPage = $request->input('start', 0) / $pageSize + 1;
-        $inventory = $query->paginate($pageSize, ['*'], 'page', $currentPage);
+        // length dibatasi agar klien tidak bisa meminta seluruh gudang sekaligus.
+        $length = (int) $request->input('length', 10);
+        $length = $length < 1 ? 10 : min($length, 100);
+        $start = max(0, (int) $request->input('start', 0));
 
-        // Prepare the JSON response
-        $response = [
-            'draw' => $request->input('draw', 1),
-            'recordsTotal' => Inventory::count(), // Total count of all records in the table
+        return response()->json([
+            'draw' => $draw,
+            // recordsTotal tidak ditampilkan di UI (info: false), jadi tidak perlu count(*) seluruh tabel.
+            'recordsTotal' => $recordsFiltered,
             'recordsFiltered' => $recordsFiltered,
-            'data' => $inventory->items(),
-        ];
-
-        return response()->json($response);
+            'data' => $query->skip($start)->take($length)->get(),
+        ]);
     }
 
     /**
